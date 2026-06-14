@@ -5470,5 +5470,90 @@ const submitArchiveChildren = async () => {
             });
         }
     </script>
+    <!-- ============================================================ -->
+<!-- FIREBASE CLOUD MESSAGING - YASSA Mobile Push Notification   -->
+<!-- Tambahkan kode ini SEBELUM tag </body> di index.html        -->
+<!-- Letakkan SETELAH script service worker yang sudah ada       -->
+<!-- ============================================================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAKMECZeKWpbYz5fB_1dWNAaa5uiqoUwIU",
+    authDomain: "yassamobile-1e4d2998.firebaseapp.com",
+    projectId: "yassamobile-1e4d2998",
+    storageBucket: "yassamobile-1e4d2998.firebasestorage.app",
+    messagingSenderId: "1071864272227",
+    appId: "1:1071864272227:web:78b1354aa825b713d36f56"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const messaging = getMessaging(app);
+
+  // ---- Minta izin notifikasi & dapatkan token FCM ----
+  async function initPushNotification() {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.log('[FCM] Izin notifikasi ditolak.');
+        return;
+      }
+
+      // Dapatkan VAPID key dari Firebase Console:
+      // Project Settings → Cloud Messaging → Web Push certificates → Key pair
+      const token = await getToken(messaging, {
+        vapidKey: 'BHIK0YI29D_A7VoUrVQ7kSbCe7BpGbYIvvZn0KX50a2CXWAfNubkRQlhKK3jDMOsKFYUL7mHKoQDh2XtsanW6KA',
+        serviceWorkerRegistration: await navigator.serviceWorker.ready
+      });
+
+      if (token) {
+        console.log('[FCM] Token berhasil:', token);
+        // Subscribe ke topic "pengurus" via GAS backend
+        await subscribeToTopic(token);
+      }
+    } catch (err) {
+      console.error('[FCM] Error init:', err);
+    }
+  }
+
+  // ---- Subscribe token ke topic "pengurus" ----
+  async function subscribeToTopic(token) {
+    try {
+      // Kirim token ke GAS untuk didaftarkan ke topic FCM
+      const gasUrl = "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec";
+      await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'subscribeToken', token: token })
+      });
+      console.log('[FCM] Berhasil subscribe ke topic pengurus');
+    } catch (e) {
+      console.error('[FCM] Gagal subscribe topic:', e);
+    }
+  }
+
+  // ---- Tampilkan notifikasi saat app sedang terbuka (foreground) ----
+  onMessage(messaging, (payload) => {
+    console.log('[FCM] Pesan masuk (foreground):', payload);
+    const { title, body } = payload.notification;
+
+    // Tampilkan sebagai notifikasi native browser
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body: body,
+        icon: '/yassamobile/icon-192.png',
+        badge: '/yassamobile/icon-192.png'
+      });
+    }
+  });
+
+  // Jalankan setelah halaman load
+  window.addEventListener('load', () => {
+    if ('Notification' in window && 'serviceWorker' in navigator) {
+      initPushNotification();
+    }
+  });
+</script>
 </body>
 </html>
