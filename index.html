@@ -5432,13 +5432,41 @@ const submitArchiveChildren = async () => {
         root.render(<App />);
     </script>
 
-    <!-- PWA Service Worker -->
+    <!-- PWA Service Worker + Auto-Update -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('service-worker.js')
-                    .then(reg => console.log('✅ SW YASSA terdaftar:', reg.scope))
+                    .then(reg => {
+                        console.log('✅ SW YASSA terdaftar:', reg.scope);
+
+                        // Deteksi SW baru tersedia
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            console.log('[SW] Update ditemukan, menginstall...');
+
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed') {
+                                    if (navigator.serviceWorker.controller) {
+                                        // Ada versi baru → kirim perintah skip waiting
+                                        console.log('[SW] Versi baru siap, aktivasi...');
+                                        newWorker.postMessage('SKIP_WAITING');
+                                    }
+                                }
+                            });
+                        });
+                    })
                     .catch(err => console.error('❌ SW gagal:', err));
+
+                // Reload otomatis saat SW baru mengambil alih
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        refreshing = true;
+                        console.log('[SW] Controller baru aktif, reload...');
+                        window.location.reload();
+                    }
+                });
             });
         }
     </script>
