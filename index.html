@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#16a34a" />
+  <title>YASSA Mobile</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="YASSA" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .logo-ring {
+      width: 100px;
+      height: 100px;
+      background: #16a34a;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 8px 32px rgba(22,163,74,0.3);
+    }
+    .logo-ring span { font-size: 40px; }
+    h1 {
+      color: #15803d;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -1px;
+    }
+    .sub {
+      color: #6b7280;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+    .badge {
+      display: inline-block;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 24px;
+    }
+    .status {
+      color: #9ca3af;
+      font-size: 12px;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-ring"><span>🕌</span></div>
+    <h1>YASSA</h1>
+    <p class="sub">Yayasan Salam Satu Aspal</p>
+    <div class="badge">✅ PWA Aktif</div>
+    <p class="status">⏳ Aplikasi sedang dipersiapkan...</p>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(reg => console.log('✅ SW terdaftar:', reg.scope))
+          .catch(err => console.error('❌ SW gagal:', err));
+      });
+    }
+  </script>
+</body>
+</html>
