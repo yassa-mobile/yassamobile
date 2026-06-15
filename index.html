@@ -1444,7 +1444,7 @@ const submitArchiveChildren = async () => {
 
                         // 🔔 Daftarkan FCM token setelah login berhasil
                         if ('Notification' in window && 'serviceWorker' in navigator) {
-                            console.log('[FCM] cleanUsername saat dipanggil:', cleanUsername);
+                            // FCM dipanggil setelah login
                             initPushNotification(cleanUsername);
                         }
 
@@ -5514,7 +5514,7 @@ const submitArchiveChildren = async () => {
       });
 
       if (token) {
-        console.log('[FCM] Token berhasil:', token);
+        console.log('[FCM] Token berhasil didapat ✅');
         // Subscribe ke topic "pengurus" via GAS backend
         await subscribeToTopic(token, usernameParam);
       }
@@ -5537,7 +5537,7 @@ const submitArchiveChildren = async () => {
         method: 'GET',
         mode: 'no-cors'
       });
-      console.log('[FCM] Token dikirim ke GAS, username:', username);
+      console.log('[FCM] Token dikirim ke GAS ✅');
     } catch (e) {
       console.error('[FCM] Gagal subscribe topic:', e);
     }
