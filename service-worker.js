@@ -104,6 +104,9 @@ self.addEventListener('activate', event => {
 
 // ---- FETCH: Network First untuk HTML, Cache First untuk aset ----
 self.addEventListener('fetch', event => {
+  // Jangan cache POST request
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
 
   // Request ke GAS backend → selalu network, jangan pernah cache
