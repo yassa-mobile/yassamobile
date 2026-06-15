@@ -5561,7 +5561,8 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
   // Jalankan setelah halaman load
   window.addEventListener('load', () => {
     if ('Notification' in window && 'serviceWorker' in navigator) {
-      initPushNotification();
+      // initPushNotification dipanggil setelah login — lihat baris 1445
+// initPushNotification();
     }
   });
 </script>
