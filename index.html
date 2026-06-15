@@ -5524,10 +5524,11 @@ const submitArchiveChildren = async () => {
       const gasUrl = "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec";
       await fetch(gasUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'subscribeToken', token: token })
       });
-      console.log('[FCM] Berhasil subscribe ke topic pengurus');
+      console.log('[FCM] Token dikirim ke GAS');
     } catch (e) {
       console.error('[FCM] Gagal subscribe topic:', e);
     }
