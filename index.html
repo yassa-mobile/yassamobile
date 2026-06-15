@@ -1442,11 +1442,11 @@ const submitArchiveChildren = async () => {
                         setTab('home');
                         sendLog(cleanUsername, assignedRole, assignedWilayah, 'Berhasil Login');
 
-// 🔔 Daftarkan FCM token setelah login berhasil
-if ('Notification' in window && 'serviceWorker' in navigator) {
-    console.log('[FCM] cleanUsername saat dipanggil:', cleanUsername);
-    initPushNotification(cleanUsername);
-}
+                        // 🔔 Daftarkan FCM token setelah login berhasil
+                        if ('Notification' in window && 'serviceWorker' in navigator) {
+                            console.log('[FCM] cleanUsername saat dipanggil:', cleanUsername);
+                            initPushNotification(cleanUsername);
+                        }
 
                         // 🔴 LOGIKA PAKSA GANTI PASSWORD SEMENTARA 🔴
                         // Jika pengurus masuk menggunakan sandi reset default dari Admin
