@@ -5545,24 +5545,27 @@ const submitArchiveChildren = async () => {
 
   // ---- Tampilkan notifikasi saat app sedang terbuka (foreground) ----
   onMessage(messaging, (payload) => {
-    console.log('[FCM] Pesan masuk (foreground):', payload);
-    const { title, body } = payload.notification;
+    try {
+      console.log('[FCM] Pesan masuk (foreground):', payload);
+      const { title, body } = payload.notification;
 
-    // Tampilkan sebagai notifikasi native browser
-    if (Notification.permission === 'granted') {
-      new Notification(title, {
-        body: body,
-        icon: '/yassamobile/icon-192.png',
-        badge: '/yassamobile/icon-192.png'
-      });
-    }
-  });
-
-  // Jalankan setelah halaman load
-  window.addEventListener('load', () => {
-    if ('Notification' in window && 'serviceWorker' in navigator) {
-      // initPushNotification dipanggil setelah login — lihat baris 1445
-// initPushNotification();
+      // Tampilkan sebagai notifikasi mobile-friendly melalui Service Worker
+      if (Notification.permission === 'granted') {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then((registration) => {
+            registration.showNotification(title, {
+              body: body,
+              icon: '/yassamobile/icon-192.png',
+              badge: '/yassamobile/icon-192.png',
+              vibrate: [200, 100, 200]
+            });
+          }).catch((swErr) => {
+             console.error('[FCM] Service Worker gagal merender notifikasi:', swErr);
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[FCM] Error saat memproses pesan foreground:', error);
     }
   });
 </script>
