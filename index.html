@@ -5520,13 +5520,16 @@ const submitArchiveChildren = async () => {
   // ---- Subscribe token ke topic "pengurus" ----
   async function subscribeToTopic(token) {
     try {
-      // Kirim token ke GAS untuk didaftarkan ke topic FCM
+      // Titip ke postApi yang sudah ada di app — sudah handle CORS
       const gasUrl = "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec";
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify({ 
+        action: 'subscribeToken', 
+        token: token 
+      }));
       await fetch(gasUrl, {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'subscribeToken', token: token })
+        body: formData
       });
       console.log('[FCM] Token dikirim ke GAS');
     } catch (e) {
