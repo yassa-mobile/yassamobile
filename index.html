@@ -281,9 +281,16 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         // ⚠️ SANGAT PENTING: GANTI TEKS DI BAWAH DENGAN URL WEB APP ANDA
         // ============================================================
         // ============================================================
-        // 🔒 KONFIGURASI GAS URL (Jangan dibagikan ke publik)
+        // ⚙️ KONFIGURASI TERPUSAT YASSA MOBILE
+        // Edit di sini kalau ada perubahan URL atau versi
         // ============================================================
-        let URL_DATABASE_PERMANEN = "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec";
+        const YASSA_CONFIG = {
+            GAS_URL    : "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec",
+            APP_VERSION: "1.0.0",
+            FCM_VAPID  : "BHIK0YI29D_A7VoUrVQ7kSbCe7BpGbYIvvZn0KX50a2CXWAfNubkRQlhKK3jDMOsKFYUL7mHKoQDh2XtsanW6KA",
+            FCM_TOPIC  : "pengurus"
+        };
+        let URL_DATABASE_PERMANEN = YASSA_CONFIG.GAS_URL;
 
         // ============================================================
         // 🔒 SESSION HELPER — localStorage + expiry 8 jam
@@ -5509,7 +5516,7 @@ const submitArchiveChildren = async () => {
       // Dapatkan VAPID key dari Firebase Console:
       // Project Settings → Cloud Messaging → Web Push certificates → Key pair
       const token = await getToken(messaging, {
-        vapidKey: 'BHIK0YI29D_A7VoUrVQ7kSbCe7BpGbYIvvZn0KX50a2CXWAfNubkRQlhKK3jDMOsKFYUL7mHKoQDh2XtsanW6KA',
+        vapidKey: (typeof YASSA_CONFIG !== 'undefined' ? YASSA_CONFIG.FCM_VAPID : 'BHIK0YI29D_A7VoUrVQ7kSbCe7BpGbYIvvZn0KX50a2CXWAfNubkRQlhKK3jDMOsKFYUL7mHKoQDh2XtsanW6KA'),
         serviceWorkerRegistration: await navigator.serviceWorker.ready
       });
 
@@ -5527,7 +5534,7 @@ const submitArchiveChildren = async () => {
   async function subscribeToTopic(token, usernameParam) {
     try {
       const username = usernameParam || yassaStore.get('yassa-username') || 'unknown';
-      const gasUrl = "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec";
+      const gasUrl = typeof YASSA_CONFIG !== "undefined" ? YASSA_CONFIG.GAS_URL : "https://script.google.com/macros/s/AKfycbymw1J86iH_QQeD1Ee5X_q4mxMJX5dagD3FyZr8DfE1eCZ0oz5Aah2LnU94cBqlKchx/exec";
       const params = new URLSearchParams({
         action: 'subscribeToken',
         token: token,
