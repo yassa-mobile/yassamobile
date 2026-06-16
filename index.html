@@ -1449,18 +1449,23 @@ const submitArchiveChildren = async () => {
                         setTab('home');
                         sendLog(cleanUsername, assignedRole, assignedWilayah, 'Berhasil Login');
 
-                        // 🔔 Daftarkan FCM token setelah login berhasil
-                        if ('Notification' in window && 'serviceWorker' in navigator) {
-                            // FCM dipanggil setelah login
-                            initPushNotification(cleanUsername);
-                        }
-
                         // 🔴 LOGIKA PAKSA GANTI PASSWORD SEMENTARA 🔴
-                        // Jika pengurus masuk menggunakan sandi reset default dari Admin
-                        // Diperbarui: Kebal huruf besar/kecil (dari keyboard HP) & spasi
+                        // PINDAH KE ATAS: Agar diproses duluan sebelum kode notifikasi
                         if (password.toString().trim().toLowerCase() === 'yassa1234') {
                             setPwdModalOpen('force'); // Kunci modal tanpa tombol X
                             yassaStore.set('yassa-force-pwd', 'true');
+                        }
+
+                        // 🔔 Daftarkan FCM token setelah login berhasil
+                        try {
+                            if ('Notification' in window && 'serviceWorker' in navigator) {
+                                // Dibungkus pelindung agar error notifikasi tidak menggagalkan popup ganti password
+                                if (typeof initPushNotification === 'function') {
+                                    initPushNotification(cleanUsername);
+                                }
+                            }
+                        } catch (e) {
+                            console.log('FCM Error diabaikan:', e);
                         }
 
                     } else { 
