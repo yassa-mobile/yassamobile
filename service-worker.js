@@ -23,46 +23,40 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// ---- Tampilkan notifikasi saat app di background/tertutup ----
 messaging.onBackgroundMessage((payload) => {
   try {
-    console.log('[SW-FCM] Notifikasi background:', payload);
-
     const { title, body } = payload.notification;
-
     return self.registration.showNotification(title, {
       body: body,
       icon: '/yassamobile/icon-192.png',
       badge: '/yassamobile/icon-192.png',
       vibrate: [200, 100, 200],
-      tag: 'yassa-notif', // Supaya tidak menumpuk
+      tag: 'yassa-notif',
       renotify: true,
       data: { url: '/yassamobile/' }
     });
   } catch (err) {
-    console.error('[FCM] Error menampilkan notifikasi background:', err);
+    console.error('[FCM] Error notifikasi background:', err);
   }
 });
 
-// ---- Klik notifikasi → buka app ----
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // Kalau app sudah terbuka → fokus ke tab itu
         for (const client of clientList) {
           if (client.url.includes('/yassamobile/') && 'focus' in client) {
             return client.focus();
           }
         }
-        // Kalau belum terbuka → buka tab baru
         if (clients.openWindow) {
           return clients.openWindow('/yassamobile/');
         }
       })
   );
 });
+
 const CACHE_NAME = 'yassa-cache-v4';
 
 const STATIC_ASSETS = [
@@ -73,9 +67,8 @@ const STATIC_ASSETS = [
   '/yassamobile/icon-512.png'
 ];
 
-// ---- INSTALL: Cache semua aset statis ----
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v3...');
+  console.log('[SW] Installing v4...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
@@ -86,9 +79,8 @@ self.addEventListener('install', event => {
   );
 });
 
-// ---- ACTIVATE: Hapus cache lama, ambil alih semua client ----
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating v3...');
+  console.log('[SW] Activating v4...');
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
@@ -106,20 +98,16 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ---- FETCH: Network First untuk HTML, Cache First untuk aset ----
 self.addEventListener('fetch', event => {
-  // Jangan cache POST request
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Request ke GAS backend → selalu network, jangan pernah cache
   if (url.hostname.includes('script.google.com')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // index.html → Network First (supaya selalu dapat versi terbaru)
   if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
     event.respondWith(
       fetch(event.request)
@@ -130,14 +118,11 @@ self.addEventListener('fetch', event => {
           }
           return response;
         })
-        .catch(() => {
-          return caches.match(event.request);
-        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // Aset lain (icon, manifest) → Cache First
   event.respondWith(
     caches.match(event.request)
       .then(cached => {
@@ -156,6 +141,12 @@ self.addEventListener('fetch', event => {
         }
       })
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // ---- MESSAGE: Terima perintah dari app ----
