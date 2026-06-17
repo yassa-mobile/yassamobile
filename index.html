@@ -574,26 +574,32 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
 
 // FUNGSI REFRESH (Diperbarui agar membaca sheet Arsip_Anak)
 const refresh = useCallback(async () => {
-                if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
-                setLoading("MENGAMBIL DATA...");
-                try {
-                    const tkn = yassaStore.get('yassa-token') || '';
-                    const [resK, resA, resP, resInfo, resArsip] = await Promise.all([
-                        postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
-                        postApi({ action: 'read', sheet: 'Anak', token: tkn }),
-                        postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []}))
-                    ]);
-                    
-                    if (resK.success && resA.success) {
-                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [] });
-                    }
-                } catch (e) { 
-                    setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
-                }
-                setLoading(false);
-            }, [role]);
+    if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
+    setLoading("MENGAMBIL DATA...");
+    try {
+        const tkn = yassaStore.get('yassa-token') || '';
+        const [resK, resA, resP, resInfo, resArsip] = await Promise.all([
+            postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
+            postApi({ action: 'read', sheet: 'Anak', token: tkn }),
+            postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
+            postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
+            postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []}))
+        ]);
+        
+        if (resK.success && resA.success) {
+            setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [] });
+        } else {
+            // ← TAMBAHKAN INI: tampilkan error kalau gagal
+            setMsg("⚠️ Gagal mengambil data. Cek koneksi atau coba refresh.");
+            setTimeout(() => setMsg(""), 5000);
+        }
+    } catch (e) { 
+        setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
+        setTimeout(() => setMsg(""), 5000);
+    } finally {
+        setLoading(false); // ← PINDAHKAN KE FINALLY agar selalu jalan
+    }
+}, [role]);
 // =================================================================
 // 🆕 FUNGSI KALKULASI DATA MASUK & KELUAR (SUPER STRICT FILTER)
 // =================================================================
