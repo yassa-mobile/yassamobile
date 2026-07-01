@@ -11,6 +11,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="YASSA App">
     <meta name="theme-color" content="#16a34a">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
     <!-- Fallback icon for Add to Home Screen -->
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" sizes="192x192" href="icon-192.png">
@@ -26,13 +28,14 @@
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
-    :root { --yassa-green: #16a34a; }
+    :root { --yassa-green: #16a34a; color-scheme: light; }
     
     body { 
         font-family: 'Plus Jakarta Sans', sans-serif; 
         -webkit-tap-highlight-color: transparent; 
         overscroll-behavior: none; 
         background-color: #f8fafc;
+        color-scheme: light;
     }
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -52,6 +55,12 @@
         .print-card { page-break-inside: auto !important; border: 1px solid #94a3b8 !important; padding: 12px; border-radius: 8px; }
     }
     .print-only { display: none; }
+
+    /* Cegah Android/Chrome menerapkan force-dark miliknya sendiri ke elemen form,
+       supaya tampilan input & select tetap konsisten dan hanya diatur oleh mode malam kita sendiri */
+    input, select, textarea {
+        color-scheme: light;
+    }
 
     /* ============================================================ */
     /* MODE MALAM (DARK MODE)                                        */
