@@ -762,11 +762,34 @@ const submitArchiveChildren = async () => {
             const [filterJenjang, setFilterJenjang] = useState([]);
 
             const [regionAnalysisFilter, setRegionAnalysisFilter] = useState('');
-            const [printMonthInput, setPrintMonthInput] = useState(''); 
-            
+
+            // STATE PARAMETER LAPORAN (Periode, Rp Dasar, Rp Bonus)
+            // Dipisah jadi versi "Raw" (instan, buat tampilan ketikan) dan versi
+            // final yang di-debounce 300ms, karena nilai ini dipakai untuk
+            // menghitung ulang nominal santunan tiap kartu keluarga di Buku Induk.
+            // Tanpa debounce ini, setiap ketuk/hapus huruf memicu kalkulasi berat
+            // untuk seluruh data yang tampil -> input terasa delay/lag.
+            const [printMonthInputRaw, setPrintMonthInputRaw] = useState('');
+            const [printMonthInput, setPrintMonthInput] = useState('');
+            React.useEffect(() => {
+                const timer = setTimeout(() => setPrintMonthInput(printMonthInputRaw), 300);
+                return () => clearTimeout(timer);
+            }, [printMonthInputRaw]);
+
             // STATE: KALKULATOR PRINT GOPAY
+            const [printBaseNominalRaw, setPrintBaseNominalRaw] = useState('');
             const [printBaseNominal, setPrintBaseNominal] = useState('');
+            React.useEffect(() => {
+                const timer = setTimeout(() => setPrintBaseNominal(printBaseNominalRaw), 300);
+                return () => clearTimeout(timer);
+            }, [printBaseNominalRaw]);
+
+            const [printBonusNominalRaw, setPrintBonusNominalRaw] = useState('');
             const [printBonusNominal, setPrintBonusNominal] = useState('');
+            React.useEffect(() => {
+                const timer = setTimeout(() => setPrintBonusNominal(printBonusNominalRaw), 300);
+                return () => clearTimeout(timer);
+            }, [printBonusNominalRaw]);
 
             // STATE: PENANDAAN KERTAS SEMENTARA (TIDAK PERMANEN)
             const [paperColors, setPaperColors] = useState({});
@@ -3013,9 +3036,9 @@ const submitArchiveChildren = async () => {
                                                         
                                                         {role === 'admin' && (
                                                             <>
-                                                                <input type="text" placeholder="Periode (Cth: MARET 2026)" className="bg-[#E0E5EC] border-none px-4 py-3.5 rounded-xl text-[10px] font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:ring-2 focus:ring-emerald-300 w-full transition-all text-slate-700 placeholder:text-slate-400" style={{textTransform:'uppercase'}} value={printMonthInput} onChange={e => setPrintMonthInput(e.target.value)} />
-                                                                <input type="number" placeholder="Rp Dasar (Cth: 100000)" className="bg-[#E0E5EC] border-none px-4 py-3.5 rounded-xl text-[10px] font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:ring-2 focus:ring-amber-300 text-amber-700 placeholder:text-amber-500/70 w-full transition-all" value={printBaseNominal} onChange={e => setPrintBaseNominal(e.target.value)} />
-                                                                <input type="number" placeholder="Rp Bonus YP/Dsb (Cth: 50000)" className="bg-[#E0E5EC] border-none px-4 py-3.5 rounded-xl text-[10px] font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:ring-2 focus:ring-rose-300 text-rose-700 placeholder:text-rose-500/70 w-full transition-all" value={printBonusNominal} onChange={e => setPrintBonusNominal(e.target.value)} />
+                                                                <input type="text" placeholder="Periode (Cth: MARET 2026)" className="bg-[#E0E5EC] border-none px-4 py-3.5 rounded-xl text-[10px] font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:ring-2 focus:ring-emerald-300 w-full transition-all text-slate-700 placeholder:text-slate-400" style={{textTransform:'uppercase'}} value={printMonthInputRaw} onChange={e => setPrintMonthInputRaw(e.target.value)} />
+                                                                <input type="number" placeholder="Rp Dasar (Cth: 100000)" className="bg-[#E0E5EC] border-none px-4 py-3.5 rounded-xl text-[10px] font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:ring-2 focus:ring-amber-300 text-amber-700 placeholder:text-amber-500/70 w-full transition-all" value={printBaseNominalRaw} onChange={e => setPrintBaseNominalRaw(e.target.value)} />
+                                                                <input type="number" placeholder="Rp Bonus YP/Dsb (Cth: 50000)" className="bg-[#E0E5EC] border-none px-4 py-3.5 rounded-xl text-[10px] font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:ring-2 focus:ring-rose-300 text-rose-700 placeholder:text-rose-500/70 w-full transition-all" value={printBonusNominalRaw} onChange={e => setPrintBonusNominalRaw(e.target.value)} />
                                                             </>
                                                         )}
                                                     </div>
