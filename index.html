@@ -2663,14 +2663,50 @@ const submitArchiveChildren = async () => {
                         )}
 
                         {tab === 'perisai' && (
-                            <div className="space-y-4 fade-in no-print flex flex-col items-center justify-center pt-32">
-                                <Icon name="shield" size={64} className="text-slate-300 mb-4 opacity-50" />
-                                <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">
-                                    Tab Kontrol Kosong
-                                </p>
-                                <p className="text-[10px] text-slate-400 font-bold text-center mt-2 max-w-[250px]">
-                                    Seluruh sistem kontrol Perisai YASSA telah dipindahkan ke tab Profile (Aksi) pada bagian Pengaturan Keamanan.
-                                </p>
+                            <div className="space-y-5 fade-in no-print pt-6">
+                                <div className="text-center mb-2">
+                                    <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Pusat Kontrol</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pilih tindakan yang ingin dilakukan</p>
+                                </div>
+
+                                {role === 'admin' && (
+                                    <button
+                                        onClick={() => { setRegFamily({}); setRegChildren([]); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }}
+                                        className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all p-6 flex items-center gap-5 text-left"
+                                    >
+                                        <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                            <Icon name="plus-circle" size={24} className="text-green-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-black text-slate-800 text-sm uppercase tracking-wide">Tambah Data Baru</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">Daftarkan keluarga & data anak baru</p>
+                                        </div>
+                                        <Icon name="chevron-right" size={18} className="text-slate-400 shrink-0" />
+                                    </button>
+                                )}
+
+                                {(role === 'admin' || role === 'korwil' || role === 'pengurus') && (
+                                    <button
+                                        onClick={() => { setTab('keluarga'); setSearchQuery(''); }}
+                                        className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all p-6 flex items-center gap-5 text-left"
+                                    >
+                                        <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                            <Icon name="edit" size={24} className="text-blue-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-black text-slate-800 text-sm uppercase tracking-wide">Update Data</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">Ubah nomor rekening, alamat, dll</p>
+                                        </div>
+                                        <Icon name="chevron-right" size={18} className="text-slate-400 shrink-0" />
+                                    </button>
+                                )}
+
+                                {role === 'guest' && (
+                                    <div className="flex flex-col items-center justify-center pt-16 text-center">
+                                        <Icon name="shield" size={48} className="text-slate-300 mb-3 opacity-50" />
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest max-w-[220px]">Fitur ini hanya tersedia untuk Admin, Korwil, dan Pengurus</p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
