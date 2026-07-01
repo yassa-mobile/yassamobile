@@ -2663,379 +2663,14 @@ const submitArchiveChildren = async () => {
                         )}
 
                         {tab === 'perisai' && (
-                            <div className="space-y-4 fade-in no-print">
-
-                                {/* HEADER KONTROL & PERISAI */}
-                                <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-[2.5rem] text-white relative overflow-hidden shadow-xl">
-                                    <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/5 rounded-full"></div>
-                                    <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-white/5 rounded-full"></div>
-                                    <div className="flex items-center gap-4 relative">
-                                        <div className="flex items-center justify-center w-14 h-14 bg-white/10 rounded-2xl shrink-0">
-                                            <Icon name="activity" size={28} className="text-blue-300" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] font-black text-blue-300 uppercase tracking-[3px] mb-1">Pusat Sistem</p>
-                                            <h2 className="text-lg font-black uppercase tracking-tight leading-tight">Kontrol YASSA</h2>
-                                            <p className="text-[10px] text-white/60 font-bold mt-1">Control Update & Security</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* NAVIGASI 2 MENU (CONTROL & PERISAI) */}
-                                <div className="flex bg-[#E0E5EC] p-2 rounded-[2.5rem] shadow-[inset_6px_6px_10px_rgb(163,177,198,0.6),inset_-6px_-6px_10px_rgba(255,255,255,0.8)] overflow-x-auto no-scrollbar relative z-10 border-none mb-2">
-                                    <button onClick={() => setPerisaiMainMenu('control')} className={`flex-1 py-3 px-4 rounded-[2rem] text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${perisaiMainMenu === 'control' ? 'bg-[#E0E5EC] text-blue-600 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>Control Update</button>
-                                    <button onClick={() => setPerisaiMainMenu('perisai')} className={`flex-1 py-3 px-4 rounded-[2rem] text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${perisaiMainMenu === 'perisai' ? 'bg-[#E0E5EC] text-red-600 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>Perisai YASSA</button>
-                                </div>
-
-                                {/* KONTEN MENU 1: CONTROL UPDATE */}
-                                {perisaiMainMenu === 'control' && (
-                                    <div className="flex flex-col items-center justify-center p-10 bg-[#E0E5EC] rounded-[2.5rem] shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] fade-in">
-                                        <Icon name="user" size={40} className="text-slate-300 mb-4" />
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">
-                                            Statistik Kontrol Update<br/>Telah Dipindahkan ke Rincian Profil Anda
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* KONTEN MENU 2: PERISAI YASSA */}
-                                {perisaiMainMenu === 'perisai' && (
-                                    <div className="space-y-4 fade-in">
-                                        {/* KARTU STATISTIK KEAMANAN HARI INI */}
-                                        {role === 'admin' && (() => {
-                                    const today = new Date().toISOString().slice(0, 10);
-                                    const seranganHariIni = securityLog.filter(log => {
-                                        const waktu = (log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString();
-                                        const jenis  = (log['Jenis Event']   || log['JENIS EVENT']   || '').toString().toUpperCase();
-                                        return waktu.startsWith(today) && (
-                                            jenis.includes('BLOCKED') ||
-                                            jenis.includes('RATE_LIMIT') ||
-                                            jenis.includes('ACCOUNT_LOCKED') ||
-                                            jenis.includes('LOGIN_FAILED')
-                                        );
-                                    }).length;
-                                    const diblokir = blacklistData.filter(d =>
-                                        (d['Status'] || d['STATUS'] || '').toString().toUpperCase() === 'AKTIF'
-                                    ).length;
-                                    // USER UNIK YANG SUDAH LOGIN HARI INI (1 user dihitung 1x walau login berkali-kali)
-                                    const userLoginHariIni = new Set(
-                                        securityLog
-                                            .filter(log => {
-                                                const waktu = (log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString();
-                                                const jenis = (log['Jenis Event'] || log['JENIS EVENT'] || '').toString().toUpperCase();
-                                                return waktu.startsWith(today) && jenis.includes('LOGIN_SUCCESS');
-                                            })
-                                            .map(log => (log['Username'] || log['USERNAME'] || '').toString().trim())
-                                            .filter(u => u !== '')
-                                    ).size;
-                                    return (
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-[2rem] p-4 text-white shadow-lg">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-7 h-7 bg-white/20 rounded-xl flex items-center justify-center">
-                                                        <Icon name="zap" size={14} className="text-white" />
-                                                    </div>
-                                                    <p className="text-[8px] font-black uppercase tracking-widest text-white/80">Serangan Dicegah</p>
-                                                </div>
-                                                <p className="text-4xl font-black leading-none mb-1">{seranganHariIni}</p>
-                                                <p className="text-[8px] text-white/60 font-bold">Bot, Spam & Login Gagal · Hari ini</p>
-                                            </div>
-                                            <div className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-[2rem] p-4 text-white shadow-lg">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-7 h-7 bg-white/20 rounded-xl flex items-center justify-center">
-                                                        <Icon name="ban" size={14} className="text-white" />
-                                                    </div>
-                                                    <p className="text-[8px] font-black uppercase tracking-widest text-white/80">User Diblokir</p>
-                                                </div>
-                                                <p className="text-4xl font-black leading-none mb-1">{diblokir}</p>
-                                                <p className="text-[8px] text-white/60 font-bold">Active blacklist · Saat ini</p>
-                                            </div>
-                                            <div className="bg-gradient-to-br from-emerald-500 to-green-700 rounded-[2rem] p-4 text-white shadow-lg">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-7 h-7 bg-white/20 rounded-xl flex items-center justify-center">
-                                                        <Icon name="users" size={14} className="text-white" />
-                                                    </div>
-                                                    <p className="text-[8px] font-black uppercase tracking-widest text-white/80">User Login</p>
-                                                </div>
-                                                <p className="text-4xl font-black leading-none mb-1">{userLoginHariIni}</p>
-                                                <p className="text-[8px] text-white/60 font-bold">User unik · Hari ini</p>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-
-                                {/* HANYA ADMIN YANG BISA AKSES */}
-                                {role !== 'admin' ? (
-                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
-                                        <div className="flex items-center justify-center w-16 h-16 bg-red-50 rounded-full mx-auto mb-4">
-                                            <Icon name="lock" size={28} className="text-red-400" />
-                                        </div>
-                                        <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-2">Akses Terbatas</h3>
-                                        <p className="text-[11px] text-slate-400 font-bold leading-relaxed">
-                                            Halaman ini hanya bisa diakses oleh <span className="text-red-500">Admin Sistem</span>.<br/>
-                                            Silakan hubungi Admin untuk informasi lebih lanjut.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {/* SUB-TAB NAVIGASI */}
-                                        <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
-                                            <button
-                                                onClick={() => {
-                                                    setSecActiveTab('log');
-                                                    if (securityLog.length === 0) {
-                                                        setSecLoadingLog(true);
-                                                        const tkn = yassaStore.get('yassa-token') || '';
-                                                        postApi({ action: 'getSecurityLog', limit: 100, token: tkn })
-                                                            .then(r => { if (r.success) setSecurityLog(r.data || []); })
-                                                            .finally(() => setSecLoadingLog(false));
-                                                    }
-                                                }}
-                                                className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${secActiveTab === 'log' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}
-                                            >
-                                                <Icon name="activity" size={13} /> Log Serangan
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setSecActiveTab('blacklist');
-                                                    if (blacklistData.length === 0) {
-                                                        setSecLoadingBlacklist(true);
-                                                        const tkn = yassaStore.get('yassa-token') || '';
-                                                        postApi({ action: 'getBlacklist', token: tkn })
-                                                            .then(r => { if (r.success) setBlacklistData(r.data || []); })
-                                                            .finally(() => setSecLoadingBlacklist(false));
-                                                    }
-                                                }}
-                                                className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${secActiveTab === 'blacklist' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}
-                                            >
-                                                <Icon name="ban" size={13} /> Blacklist
-                                            </button>
-                                        </div>
-
-                                        {/* ===== TAB LOG SERANGAN ===== */}
-                                        {secActiveTab === 'log' && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between">
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                                        {securityLog.length} event tercatat
-                                                    </p>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSecLoadingLog(true);
-                                                            const tkn = yassaStore.get('yassa-token') || '';
-                                                            postApi({ action: 'getSecurityLog', limit: 100, token: tkn })
-                                                                .then(r => { if (r.success) setSecurityLog(r.data || []); })
-                                                                .finally(() => setSecLoadingLog(false));
-                                                        }}
-                                                        className="flex items-center gap-1.5 text-[9px] font-black text-slate-500 uppercase tracking-widest bg-white px-3 py-2 rounded-xl border border-slate-100 active:scale-95 transition-all"
-                                                    >
-                                                        <Icon name="refresh-cw" size={11} /> Refresh
-                                                    </button>
-                                                </div>
-
-                                                {secLoadingLog ? (
-                                                    <div className="bg-white rounded-[2rem] p-8 flex items-center justify-center">
-                                                        <div className="w-8 h-8 border-3 border-red-100 border-t-red-500 rounded-full animate-spin"></div>
-                                                    </div>
-                                                ) : securityLog.length === 0 ? (
-                                                    <div className="bg-white rounded-[2rem] p-8 text-center">
-                                                        <Icon name="shield-check" size={32} className="text-green-400 mx-auto mb-3" />
-                                                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Belum ada log keamanan</p>
-                                                        <p className="text-[10px] text-slate-300 font-bold mt-1">Sistem aman — tidak ada aktivitas mencurigakan</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {securityLog.map((log, i) => {
-                                                            const jenis = (log['Jenis Event'] || log['JENIS EVENT'] || '').toString().toUpperCase();
-                                                            const isAlert = jenis.includes('BLOCKED') || jenis.includes('RATE_LIMIT') || jenis.includes('BLACKLIST');
-                                                            const isFail  = jenis.includes('FAILED');
-                                                            const isOk    = jenis.includes('SUCCESS') || jenis.includes('LOGIN_SUCCESS');
-                                                            return (
-                                                                <div key={i} className={`bg-white rounded-2xl border px-4 py-3 flex items-start gap-3 ${isAlert ? 'border-red-100 bg-red-50/50' : isFail ? 'border-amber-100 bg-amber-50/50' : 'border-slate-100'}`}>
-                                                                    <div className={`mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${isAlert ? 'bg-red-100' : isFail ? 'bg-amber-100' : isOk ? 'bg-green-100' : 'bg-slate-100'}`}>
-                                                                        <Icon
-                                                                            name={isAlert ? 'ban' : isFail ? 'alert-triangle' : isOk ? 'check-circle' : 'activity'}
-                                                                            size={13}
-                                                                            className={isAlert ? 'text-red-500' : isFail ? 'text-amber-500' : isOk ? 'text-green-500' : 'text-slate-400'}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                                                                            <span className={`text-[9px] font-black uppercase tracking-widest ${isAlert ? 'text-red-600' : isFail ? 'text-amber-600' : isOk ? 'text-green-600' : 'text-slate-500'}`}>
-                                                                                {log['Jenis Event'] || log['JENIS EVENT'] || '-'}
-                                                                            </span>
-                                                                            <span className="text-[8px] font-bold text-slate-300 shrink-0">
-                                                                                {(log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString().slice(11, 19)}
-                                                                            </span>
-                                                                        </div>
-                                                                        <p className="text-[10px] font-black text-slate-700 truncate">
-                                                                            {log['Username'] || log['USERNAME'] || '-'}
-                                                                        </p>
-                                                                        <p className="text-[9px] text-slate-400 font-bold leading-relaxed mt-0.5 line-clamp-2">
-                                                                            {log['Detail'] || log['DETAIL'] || '-'}
-                                                                        </p>
-                                                                        <p className="text-[8px] text-slate-300 font-bold mt-1">
-                                                                            {(log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString().slice(0, 10)}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* ===== TAB BLACKLIST ===== */}
-                                        {secActiveTab === 'blacklist' && (
-                                            <div className="space-y-4">
-
-                                                {/* FORM TAMBAH BLACKLIST */}
-                                                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                                                    <div className="bg-red-50 px-5 py-3 border-b border-red-100">
-                                                        <p className="text-[9px] font-black text-red-600 uppercase tracking-widest">🚫 Blokir User Baru</p>
-                                                    </div>
-                                                    <div className="p-5 space-y-3">
-                                                        <div>
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Username Target</label>
-                                                            <input
-                                                                type="text"
-                                                                value={blkTarget}
-                                                                onChange={e => setBlkTarget(e.target.value)}
-                                                                placeholder="Ketik username yang akan diblokir..."
-                                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-50 transition-all"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Alasan Pemblokiran</label>
-                                                            <input
-                                                                type="text"
-                                                                value={blkAlasan}
-                                                                onChange={e => setBlkAlasan(e.target.value)}
-                                                                placeholder="Contoh: Akses tidak sah, spam data..."
-                                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-50 transition-all"
-                                                            />
-                                                        </div>
-                                                        {blkMsg && (
-                                                            <p className={`text-[10px] font-black text-center py-2 px-3 rounded-xl ${blkMsg.startsWith('✅') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                                                                {blkMsg}
-                                                            </p>
-                                                        )}
-                                                        <button
-                                                            disabled={blkLoading || !blkTarget.trim() || !blkAlasan.trim()}
-                                                            onClick={async () => {
-                                                                setBlkLoading(true);
-                                                                setBlkMsg('');
-                                                                try {
-                                                                    const tkn = yassaStore.get('yassa-token') || '';
-                                                                    const res = await postApi({ action: 'blacklistUser', targetUsername: blkTarget.trim(), alasan: blkAlasan.trim(), token: tkn });
-                                                                    if (res.success) {
-                                                                        setBlkMsg('✅ ' + res.result);
-                                                                        setBlkTarget('');
-                                                                        setBlkAlasan('');
-                                                                        // Refresh daftar blacklist
-                                                                        const r2 = await postApi({ action: 'getBlacklist', token: tkn });
-                                                                        if (r2.success) setBlacklistData(r2.data || []);
-                                                                    } else {
-                                                                        setBlkMsg('❌ ' + (res.error || 'Gagal memblokir user.'));
-                                                                    }
-                                                                } catch(e) {
-                                                                    setBlkMsg('❌ Koneksi gagal.');
-                                                                }
-                                                                setBlkLoading(false);
-                                                                setTimeout(() => setBlkMsg(''), 4000);
-                                                            }}
-                                                            className={`w-full py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${blkLoading || !blkTarget.trim() || !blkAlasan.trim() ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-red-600 text-white active:scale-95 shadow-md'}`}
-                                                        >
-                                                            {blkLoading ? (
-                                                                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Memblokir...</>
-                                                            ) : (
-                                                                <><Icon name="ban" size={14} /> Blokir Sekarang</>
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* DAFTAR BLACKLIST */}
-                                                <div className="flex items-center justify-between">
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                                        {blacklistData.filter(d => (d['Status'] || d['STATUS'] || '').toString().toUpperCase() === 'AKTIF').length} user diblokir aktif
-                                                    </p>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSecLoadingBlacklist(true);
-                                                            const tkn = yassaStore.get('yassa-token') || '';
-                                                            postApi({ action: 'getBlacklist', token: tkn })
-                                                                .then(r => { if (r.success) setBlacklistData(r.data || []); })
-                                                                .finally(() => setSecLoadingBlacklist(false));
-                                                        }}
-                                                        className="flex items-center gap-1.5 text-[9px] font-black text-slate-500 uppercase tracking-widest bg-white px-3 py-2 rounded-xl border border-slate-100 active:scale-95 transition-all"
-                                                    >
-                                                        <Icon name="refresh-cw" size={11} /> Refresh
-                                                    </button>
-                                                </div>
-
-                                                {secLoadingBlacklist ? (
-                                                    <div className="bg-white rounded-[2rem] p-8 flex items-center justify-center">
-                                                        <div className="w-8 h-8 border-3 border-red-100 border-t-red-500 rounded-full animate-spin"></div>
-                                                    </div>
-                                                ) : blacklistData.length === 0 ? (
-                                                    <div className="bg-white rounded-[2rem] p-8 text-center">
-                                                        <Icon name="shield-check" size={32} className="text-green-400 mx-auto mb-3" />
-                                                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Blacklist Kosong</p>
-                                                        <p className="text-[10px] text-slate-300 font-bold mt-1">Belum ada user yang diblokir</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {blacklistData.map((d, i) => {
-                                                            const status = (d['Status'] || d['STATUS'] || '').toString().toUpperCase();
-                                                            const isAktif = status === 'AKTIF';
-                                                            const uname = d['Username'] || d['USERNAME'] || '-';
-                                                            return (
-                                                                <div key={i} className={`bg-white rounded-2xl border px-4 py-3 flex items-center gap-3 ${isAktif ? 'border-red-100' : 'border-slate-100 opacity-50'}`}>
-                                                                    <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isAktif ? 'bg-red-100' : 'bg-slate-100'}`}>
-                                                                        <Icon name="ban" size={14} className={isAktif ? 'text-red-500' : 'text-slate-400'} />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-2 mb-0.5">
-                                                                            <span className="text-[11px] font-black text-slate-800 uppercase">{uname}</span>
-                                                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${isAktif ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
-                                                                                {status}
-                                                                            </span>
-                                                                        </div>
-                                                                        <p className="text-[9px] text-slate-400 font-bold truncate">{d['Alasan'] || d['ALASAN'] || '-'}</p>
-                                                                        <p className="text-[8px] text-slate-300 font-bold mt-0.5">{(d['Waktu Diblokir'] || d['WAKTU DIBLOKIR'] || '').toString().slice(0, 16)}</p>
-                                                                    </div>
-                                                                    {isAktif && (
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                if (!window.confirm(`Cabut blokir user "${uname}"?`)) return;
-                                                                                const tkn = yassaStore.get('yassa-token') || '';
-                                                                                const res = await postApi({ action: 'removeBlacklist', targetUsername: uname, token: tkn });
-                                                                                if (res.success) {
-                                                                                    setBlkMsg('✅ ' + res.result);
-                                                                                    const r2 = await postApi({ action: 'getBlacklist', token: tkn });
-                                                                                    if (r2.success) setBlacklistData(r2.data || []);
-                                                                                } else {
-                                                                                    setBlkMsg('❌ ' + (res.error || 'Gagal mencabut blokir.'));
-                                                                                }
-                                                                                setTimeout(() => setBlkMsg(''), 3000);
-                                                                            }}
-                                                                            className="shrink-0 text-[8px] font-black text-green-600 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-xl active:scale-90 transition-all uppercase tracking-widest"
-                                                                        >
-                                                                            Cabut
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                                    </div>
-                                )}
+                            <div className="space-y-4 fade-in no-print flex flex-col items-center justify-center pt-32">
+                                <Icon name="shield" size={64} className="text-slate-300 mb-4 opacity-50" />
+                                <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">
+                                    Tab Kontrol Kosong
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-bold text-center mt-2 max-w-[250px]">
+                                    Seluruh sistem kontrol Perisai YASSA telah dipindahkan ke tab Profile (Aksi) pada bagian Pengaturan Keamanan.
+                                </p>
                             </div>
                         )}
 
@@ -4650,6 +4285,348 @@ const submitArchiveChildren = async () => {
 
     {/* Info Versi */}
     <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-[3px] pb-2">YASSA Mobile v{APP_VERSION}</p>
+
+                                {/* ============================================================ */}
+                                {/* MODAL PERISAI YASSA (Dipindahkan dari Tab Kontrol)           */}
+                                {/* ============================================================ */}
+                                {perisaiDrawerOpen && (
+                                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col p-4 fade-in no-print" onClick={() => setPerisaiDrawerOpen(false)}>
+                                        <div className="w-full max-w-md mx-auto bg-[#E0E5EC] rounded-[2.5rem] flex flex-col h-full max-h-[85vh] overflow-hidden shadow-2xl mt-auto mb-auto" onClick={e => e.stopPropagation()}>
+                                            
+                                            {/* Header Modal */}
+                                            <div className="flex items-center justify-between px-7 pt-6 pb-4 border-b border-slate-300/30 shrink-0">
+                                                <div>
+                                                    <h3 className="font-black text-slate-700 uppercase text-sm tracking-widest">Perisai YASSA</h3>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Sistem Keamanan & Log</p>
+                                                </div>
+                                                <button onClick={() => setPerisaiDrawerOpen(false)} className="p-2.5 rounded-2xl active:scale-95 transition-all flex items-center justify-center bg-[#E0E5EC] shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] border-none outline-none">
+                                                    <Icon name="x" size={15} className="text-slate-500" />
+                                                </button>
+                                            </div>
+
+                                            {/* Konten Perisai */}
+                                            <div className="p-5 overflow-y-auto space-y-4 flex-1 no-scrollbar">
+                                                
+                                                {/* KARTU STATISTIK KEAMANAN HARI INI */}
+                                                {role === 'admin' && (() => {
+                                                    const today = new Date().toISOString().slice(0, 10);
+                                                    const seranganHariIni = securityLog.filter(log => {
+                                                        const waktu = (log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString();
+                                                        const jenis  = (log['Jenis Event']   || log['JENIS EVENT']   || '').toString().toUpperCase();
+                                                        return waktu.startsWith(today) && (
+                                                            jenis.includes('BLOCKED') ||
+                                                            jenis.includes('RATE_LIMIT') ||
+                                                            jenis.includes('ACCOUNT_LOCKED') ||
+                                                            jenis.includes('LOGIN_FAILED')
+                                                        );
+                                                    }).length;
+                                                    const diblokir = blacklistData.filter(d =>
+                                                        (d['Status'] || d['STATUS'] || '').toString().toUpperCase() === 'AKTIF'
+                                                    ).length;
+                                                    const userLoginHariIni = new Set(
+                                                        securityLog
+                                                            .filter(log => {
+                                                                const waktu = (log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString();
+                                                                const jenis = (log['Jenis Event'] || log['JENIS EVENT'] || '').toString().toUpperCase();
+                                                                return waktu.startsWith(today) && jenis.includes('LOGIN_SUCCESS');
+                                                            })
+                                                            .map(log => (log['Username'] || log['USERNAME'] || '').toString().trim())
+                                                            .filter(u => u !== '')
+                                                    ).size;
+                                                    
+                                                    return (
+                                                        <div className="grid grid-cols-3 gap-3 mb-2">
+                                                            <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-[1.5rem] p-3 text-white shadow-lg">
+                                                                <div className="flex items-center gap-1.5 mb-2">
+                                                                    <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                                                                        <Icon name="zap" size={12} className="text-white" />
+                                                                    </div>
+                                                                    <p className="text-[7px] font-black uppercase tracking-widest text-white/90 leading-tight">Serangan<br/>Dicegah</p>
+                                                                </div>
+                                                                <p className="text-3xl font-black leading-none mb-1">{seranganHariIni}</p>
+                                                                <p className="text-[7px] text-white/70 font-bold">Bot & Spam</p>
+                                                            </div>
+                                                            <div className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-[1.5rem] p-3 text-white shadow-lg">
+                                                                <div className="flex items-center gap-1.5 mb-2">
+                                                                    <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                                                                        <Icon name="ban" size={12} className="text-white" />
+                                                                    </div>
+                                                                    <p className="text-[7px] font-black uppercase tracking-widest text-white/90 leading-tight">User<br/>Diblokir</p>
+                                                                </div>
+                                                                <p className="text-3xl font-black leading-none mb-1">{diblokir}</p>
+                                                                <p className="text-[7px] text-white/70 font-bold">Active blacklist</p>
+                                                            </div>
+                                                            <div className="bg-gradient-to-br from-emerald-500 to-green-700 rounded-[1.5rem] p-3 text-white shadow-lg">
+                                                                <div className="flex items-center gap-1.5 mb-2">
+                                                                    <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                                                                        <Icon name="users" size={12} className="text-white" />
+                                                                    </div>
+                                                                    <p className="text-[7px] font-black uppercase tracking-widest text-white/90 leading-tight">User<br/>Login</p>
+                                                                </div>
+                                                                <p className="text-3xl font-black leading-none mb-1">{userLoginHariIni}</p>
+                                                                <p className="text-[7px] text-white/70 font-bold">Hari ini</p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {role !== 'admin' ? (
+                                                    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
+                                                        <div className="flex items-center justify-center w-14 h-14 bg-red-50 rounded-full mx-auto mb-3">
+                                                            <Icon name="lock" size={24} className="text-red-400" />
+                                                        </div>
+                                                        <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-1.5">Akses Terbatas</h3>
+                                                        <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
+                                                            Halaman ini hanya bisa diakses oleh <span className="text-red-500">Admin Sistem</span>.
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {/* SUB-TAB NAVIGASI */}
+                                                        <div className="flex bg-[#E0E5EC] p-1.5 rounded-2xl gap-1 shadow-[inset_3px_3px_6px_rgb(163,177,198,0.6),inset_-3px_-3px_6px_rgba(255,255,255,0.8)] border-none mb-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSecActiveTab('log');
+                                                                    if (securityLog.length === 0) {
+                                                                        setSecLoadingLog(true);
+                                                                        const tkn = yassaStore.get('yassa-token') || '';
+                                                                        postApi({ action: 'getSecurityLog', limit: 100, token: tkn })
+                                                                            .then(r => { if (r.success) setSecurityLog(r.data || []); })
+                                                                            .finally(() => setSecLoadingLog(false));
+                                                                    }
+                                                                }}
+                                                                className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border-none outline-none ${secActiveTab === 'log' ? 'bg-[#E0E5EC] text-red-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}
+                                                            >
+                                                                <Icon name="activity" size={12} /> Log Serangan
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSecActiveTab('blacklist');
+                                                                    if (blacklistData.length === 0) {
+                                                                        setSecLoadingBlacklist(true);
+                                                                        const tkn = yassaStore.get('yassa-token') || '';
+                                                                        postApi({ action: 'getBlacklist', token: tkn })
+                                                                            .then(r => { if (r.success) setBlacklistData(r.data || []); })
+                                                                            .finally(() => setSecLoadingBlacklist(false));
+                                                                    }
+                                                                }}
+                                                                className={`flex-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border-none outline-none ${secActiveTab === 'blacklist' ? 'bg-[#E0E5EC] text-red-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}
+                                                            >
+                                                                <Icon name="ban" size={12} /> Blacklist
+                                                            </button>
+                                                        </div>
+
+                                                        {/* ===== TAB LOG SERANGAN ===== */}
+                                                        {secActiveTab === 'log' && (
+                                                            <div className="space-y-3">
+                                                                <div className="flex items-center justify-between px-1">
+                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                                        {securityLog.length} event tercatat
+                                                                    </p>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSecLoadingLog(true);
+                                                                            const tkn = yassaStore.get('yassa-token') || '';
+                                                                            postApi({ action: 'getSecurityLog', limit: 100, token: tkn })
+                                                                                .then(r => { if (r.success) setSecurityLog(r.data || []); })
+                                                                                .finally(() => setSecLoadingLog(false));
+                                                                        }}
+                                                                        className="flex items-center gap-1 text-[8px] font-black text-slate-500 uppercase tracking-widest bg-[#E0E5EC] px-3 py-1.5 rounded-xl shadow-[3px_3px_6px_rgb(163,177,198,0.6),-3px_-3px_6px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all border-none outline-none"
+                                                                    >
+                                                                        <Icon name="refresh-cw" size={10} /> Refresh
+                                                                    </button>
+                                                                </div>
+
+                                                                {secLoadingLog ? (
+                                                                    <div className="bg-[#E0E5EC] rounded-[2rem] p-8 flex items-center justify-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                                                        <div className="w-8 h-8 border-3 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
+                                                                    </div>
+                                                                ) : securityLog.length === 0 ? (
+                                                                    <div className="bg-[#E0E5EC] rounded-[2rem] p-8 text-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                                                        <Icon name="shield-check" size={32} className="text-green-500 mx-auto mb-3 drop-shadow-sm" />
+                                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Belum ada log</p>
+                                                                        <p className="text-[9px] text-slate-400 font-bold mt-1">Sistem aman — tidak ada aktivitas mencurigakan</p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="space-y-2">
+                                                                        {securityLog.map((log, i) => {
+                                                                            const jenis = (log['Jenis Event'] || log['JENIS EVENT'] || '').toString().toUpperCase();
+                                                                            const isAlert = jenis.includes('BLOCKED') || jenis.includes('RATE_LIMIT') || jenis.includes('BLACKLIST');
+                                                                            const isFail  = jenis.includes('FAILED');
+                                                                            const isOk    = jenis.includes('SUCCESS') || jenis.includes('LOGIN_SUCCESS');
+                                                                            
+                                                                            return (
+                                                                                <div key={i} className={`rounded-2xl px-4 py-3 flex items-start gap-3 border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] ${isAlert ? 'bg-red-50/80' : isFail ? 'bg-amber-50/80' : 'bg-[#E0E5EC]'}`}>
+                                                                                    <div className={`mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center shadow-sm ${isAlert ? 'bg-red-100' : isFail ? 'bg-amber-100' : isOk ? 'bg-green-100' : 'bg-slate-100'}`}>
+                                                                                        <Icon
+                                                                                            name={isAlert ? 'ban' : isFail ? 'alert-triangle' : isOk ? 'check-circle' : 'activity'}
+                                                                                            size={12}
+                                                                                            className={isAlert ? 'text-red-500' : isFail ? 'text-amber-500' : isOk ? 'text-green-500' : 'text-slate-500'}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                                                                                            <span className={`text-[9px] font-black uppercase tracking-widest ${isAlert ? 'text-red-600' : isFail ? 'text-amber-600' : isOk ? 'text-green-600' : 'text-slate-600'}`}>
+                                                                                                {log['Jenis Event'] || log['JENIS EVENT'] || '-'}
+                                                                                            </span>
+                                                                                            <span className="text-[8px] font-bold text-slate-400 shrink-0">
+                                                                                                {(log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString().slice(11, 19)}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <p className="text-[10px] font-black text-slate-800 truncate">
+                                                                                            {log['Username'] || log['USERNAME'] || '-'}
+                                                                                        </p>
+                                                                                        <p className="text-[9px] text-slate-500 font-bold leading-relaxed mt-0.5 line-clamp-2">
+                                                                                            {log['Detail'] || log['DETAIL'] || '-'}
+                                                                                        </p>
+                                                                                        <p className="text-[8px] text-slate-400 font-bold mt-1">
+                                                                                            {(log['Waktu Kejadian'] || log['WAKTU KEJADIAN'] || '').toString().slice(0, 10)}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* ===== TAB BLACKLIST ===== */}
+                                                        {secActiveTab === 'blacklist' && (
+                                                            <div className="space-y-4">
+                                                                {/* FORM TAMBAH BLACKLIST */}
+                                                                <div className="bg-[#E0E5EC] rounded-[1.5rem] shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] overflow-hidden border-none">
+                                                                    <div className="px-5 py-3 border-b border-slate-300/30 flex items-center gap-2">
+                                                                        <Icon name="ban" size={14} className="text-red-500" />
+                                                                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Blokir User Baru</p>
+                                                                    </div>
+                                                                    <div className="p-4 space-y-3">
+                                                                        <div>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={blkTarget}
+                                                                                onChange={e => setBlkTarget(e.target.value)}
+                                                                                placeholder="Ketik username target..."
+                                                                                className="w-full bg-[#E0E5EC] border-none px-4 py-3 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-400 shadow-[inset_3px_3px_6px_rgb(163,177,198,0.6),inset_-3px_-3px_6px_rgba(255,255,255,0.8)] transition-all placeholder:text-slate-400"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={blkAlasan}
+                                                                                onChange={e => setBlkAlasan(e.target.value)}
+                                                                                placeholder="Alasan pemblokiran..."
+                                                                                className="w-full bg-[#E0E5EC] border-none px-4 py-3 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-400 shadow-[inset_3px_3px_6px_rgb(163,177,198,0.6),inset_-3px_-3px_6px_rgba(255,255,255,0.8)] transition-all placeholder:text-slate-400"
+                                                                            />
+                                                                        </div>
+                                                                        {blkMsg && (
+                                                                            <p className={`text-[9px] font-black text-center py-2 px-3 rounded-xl shadow-sm ${blkMsg.startsWith('✅') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                                                                {blkMsg}
+                                                                            </p>
+                                                                        )}
+                                                                        <button
+                                                                            disabled={blkLoading || !blkTarget.trim() || !blkAlasan.trim()}
+                                                                            onClick={async () => {
+                                                                                setBlkLoading(true); setBlkMsg('');
+                                                                                try {
+                                                                                    const tkn = yassaStore.get('yassa-token') || '';
+                                                                                    const res = await postApi({ action: 'blacklistUser', targetUsername: blkTarget.trim(), alasan: blkAlasan.trim(), token: tkn });
+                                                                                    if (res.success) {
+                                                                                        setBlkMsg('✅ ' + res.result);
+                                                                                        setBlkTarget(''); setBlkAlasan('');
+                                                                                        const r2 = await postApi({ action: 'getBlacklist', token: tkn });
+                                                                                        if (r2.success) setBlacklistData(r2.data || []);
+                                                                                    } else { setBlkMsg('❌ ' + (res.error || 'Gagal memblokir user.')); }
+                                                                                } catch(e) { setBlkMsg('❌ Koneksi gagal.'); }
+                                                                                setBlkLoading(false); setTimeout(() => setBlkMsg(''), 4000);
+                                                                            }}
+                                                                            className={`w-full py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 outline-none border-none ${blkLoading || !blkTarget.trim() || !blkAlasan.trim() ? 'bg-[#E0E5EC] text-slate-400 shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)]' : 'bg-[#E0E5EC] text-red-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] active:scale-95'}`}
+                                                                        >
+                                                                            {blkLoading ? ( <><div className="w-3 h-3 border-2 border-slate-300 border-t-red-500 rounded-full animate-spin"></div> Proses...</> ) : ( <><Icon name="ban" size={12} /> Blokir Sekarang</> )}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* DAFTAR BLACKLIST */}
+                                                                <div className="flex items-center justify-between px-1">
+                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                                        {blacklistData.filter(d => (d['Status'] || d['STATUS'] || '').toString().toUpperCase() === 'AKTIF').length} user aktif
+                                                                    </p>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSecLoadingBlacklist(true);
+                                                                            const tkn = yassaStore.get('yassa-token') || '';
+                                                                            postApi({ action: 'getBlacklist', token: tkn })
+                                                                                .then(r => { if (r.success) setBlacklistData(r.data || []); })
+                                                                                .finally(() => setSecLoadingBlacklist(false));
+                                                                        }}
+                                                                        className="flex items-center gap-1 text-[8px] font-black text-slate-500 uppercase tracking-widest bg-[#E0E5EC] px-3 py-1.5 rounded-xl shadow-[3px_3px_6px_rgb(163,177,198,0.6),-3px_-3px_6px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all border-none outline-none"
+                                                                    >
+                                                                        <Icon name="refresh-cw" size={10} /> Refresh
+                                                                    </button>
+                                                                </div>
+
+                                                                {secLoadingBlacklist ? (
+                                                                    <div className="bg-[#E0E5EC] rounded-[2rem] p-8 flex items-center justify-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                                                        <div className="w-8 h-8 border-3 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
+                                                                    </div>
+                                                                ) : blacklistData.length === 0 ? (
+                                                                    <div className="bg-[#E0E5EC] rounded-[2rem] p-8 text-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                                                        <Icon name="shield-check" size={32} className="text-green-500 mx-auto mb-3 drop-shadow-sm" />
+                                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Blacklist Kosong</p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="space-y-2">
+                                                                        {blacklistData.map((d, i) => {
+                                                                            const status = (d['Status'] || d['STATUS'] || '').toString().toUpperCase();
+                                                                            const isAktif = status === 'AKTIF';
+                                                                            const uname = d['Username'] || d['USERNAME'] || '-';
+                                                                            return (
+                                                                                <div key={i} className={`rounded-2xl px-4 py-3 flex items-center gap-3 border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] ${isAktif ? 'bg-[#E0E5EC]' : 'bg-[#E0E5EC] opacity-60'}`}>
+                                                                                    <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${isAktif ? 'bg-red-100' : 'bg-slate-200'}`}>
+                                                                                        <Icon name="ban" size={12} className={isAktif ? 'text-red-500' : 'text-slate-400'} />
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                                                            <span className="text-[10px] font-black text-slate-800 uppercase truncate">{uname}</span>
+                                                                                            <span className={`text-[7px] font-black px-2 py-0.5 rounded-md uppercase border-none shadow-sm ${isAktif ? 'bg-red-100 text-red-600' : 'bg-slate-200 text-slate-500'}`}>
+                                                                                                {status}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <p className="text-[9px] text-slate-500 font-bold truncate">{d['Alasan'] || d['ALASAN'] || '-'}</p>
+                                                                                        <p className="text-[8px] text-slate-400 font-bold mt-0.5">{(d['Waktu Diblokir'] || d['WAKTU DIBLOKIR'] || '').toString().slice(0, 16)}</p>
+                                                                                    </div>
+                                                                                    {isAktif && (
+                                                                                        <button
+                                                                                            onClick={async () => {
+                                                                                                if (!window.confirm(`Cabut blokir user "${uname}"?`)) return;
+                                                                                                const tkn = yassaStore.get('yassa-token') || '';
+                                                                                                const res = await postApi({ action: 'removeBlacklist', targetUsername: uname, token: tkn });
+                                                                                                if (res.success) {
+                                                                                                    setBlkMsg('✅ ' + res.result);
+                                                                                                    const r2 = await postApi({ action: 'getBlacklist', token: tkn });
+                                                                                                    if (r2.success) setBlacklistData(r2.data || []);
+                                                                                                } else { setBlkMsg('❌ ' + (res.error || 'Gagal mencabut.')); }
+                                                                                                setTimeout(() => setBlkMsg(''), 3000);
+                                                                                            }}
+                                                                                            className="shrink-0 text-[8px] font-black text-emerald-600 bg-[#E0E5EC] shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] border-none px-3 py-1.5 rounded-lg active:scale-95 transition-all uppercase tracking-widest outline-none"
+                                                                                        >
+                                                                                            Cabut
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
     {/* ============================================================ */}
     {/* MODAL DETAIL PROFIL                                          */}
