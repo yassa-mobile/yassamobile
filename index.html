@@ -1813,6 +1813,12 @@ const submitArchiveChildren = async () => {
             }, [data.anak, familyLookupMap, searchQuery, filterProgram, filterWilayah, filterKategoriAnak, filterKelas, filterJenjang, filterOta, role, allowedRegions]);
 
             const openEditFamily = (f) => {
+                // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
+                if (role !== 'admin') {
+                    setRegFamily(f);
+                    setRegModal({ open: true, step: 1, mode: 'view' }); setErrorMsg('');
+                    return;
+                }
                 setRegFamily(f);
                 const relatedChildren = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                 setRegChildren(relatedChildren.length > 0 ? relatedChildren : []);
@@ -1820,6 +1826,11 @@ const submitArchiveChildren = async () => {
             };
 
             const openEditChild = (c) => {
+                // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
+                if (role !== 'admin') {
+                    setRegChildren([c]); setRegModal({ open: true, step: 2, mode: 'view' }); setErrorMsg('');
+                    return;
+                }
                 const parent = familyLookupMap[norm(getVal(c, 'ID_Keluarga'))];
                 if (parent) setRegFamily(parent);
                 setRegChildren([c]); setRegModal({ open: true, step: 2, mode: 'edit' }); setErrorMsg('');
@@ -1843,6 +1854,11 @@ const submitArchiveChildren = async () => {
             };
 
             const handleUnifiedSubmit = async () => {
+                // 🔒 PROTEKSI: hanya admin yang boleh tambah/update data (Keluarga & Anak)
+                if (role !== 'admin') {
+                    setErrorMsg("❌ Akses ditolak: hanya Admin yang dapat menambah atau mengubah data.");
+                    return;
+                }
                 setLoading("MENYIMPAN DATA...");
                 try {
                     const token = yassaStore.get('yassa-token') || '';
@@ -2764,7 +2780,7 @@ const submitArchiveChildren = async () => {
                                     </button>
                                 )}
 
-                                {(role === 'admin' || role === 'korwil' || role === 'pengurus') && (
+                                {role === 'admin' && (
                                     <div className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] transition-all overflow-hidden">
                                         <button
                                             onClick={() => setUpdateDataOpen(!updateDataOpen)}
