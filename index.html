@@ -733,7 +733,15 @@ const submitArchiveChildren = async () => {
             const [midtransErrorPopup, setMidtransErrorPopup] = useState({ open: false, errors: [] });
 
             // STATE FILTER
-            const [searchQuery, setSearchQuery] = useState('');
+            const [searchQuery, setSearchQuery] = useState(''); // nilai final (debounced) dipakai untuk filtering data
+            const [searchInput, setSearchInput] = useState(''); // nilai langsung dari ketikan, supaya input terasa instan
+
+            // DEBOUNCE: tunda proses filter berat 300ms setelah user berhenti mengetik,
+            // supaya input pencarian tidak terasa lag di device dengan data banyak
+            React.useEffect(() => {
+                const timer = setTimeout(() => setSearchQuery(searchInput), 300);
+                return () => clearTimeout(timer);
+            }, [searchInput]);
             const [filterWilayah, setFilterWilayah] = useState(''); 
             const [filterProgram, setFilterProgram] = useState(''); 
             const [filterKategoriAnak, setFilterKategoriAnak] = useState('');
@@ -1166,6 +1174,17 @@ const submitArchiveChildren = async () => {
                 });
                 return map;
             }, [data.keluarga]);
+
+            // INDEX ANAK PER KELUARGA (agar tidak looping ulang seluruh data.anak setiap kali cari 1 keluarga)
+            const anakByKeluargaMap = useMemo(() => {
+                const map = {};
+                data.anak.forEach(c => {
+                    const key = norm(getVal(c, 'ID_Keluarga'));
+                    if (!map[key]) map[key] = [];
+                    map[key].push(c);
+                });
+                return map;
+            }, [data.anak]);
 
             const generatedId = useMemo(() => {
                 if (regModal.mode === 'edit') return regFamily.ID_Keluarga;
@@ -1682,7 +1701,7 @@ const submitArchiveChildren = async () => {
                 const q = updateSearchQuery.toLowerCase();
                 result = result.filter(f => {
                     const matchKeluarga = (getVal(f, 'NAMA ALM') || '').toLowerCase().includes(q) || (getVal(f, 'NAMA IBU') || '').toLowerCase().includes(q);
-                    const anakKeluarga = data.anak.filter(c => norm(getVal(c, 'ID_Keluarga')) === norm(getVal(f, 'ID_Keluarga')));
+                    const anakKeluarga = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                     const matchAnak = anakKeluarga.some(c => (getVal(c, 'NAMA ANAK') || '').toLowerCase().includes(q));
                     return matchKeluarga || matchAnak;
                 });
@@ -1699,7 +1718,7 @@ const submitArchiveChildren = async () => {
                 
                 if (filterProgram) {
                     result = result.filter(f => {
-                        const anakKeluarga = data.anak.filter(c => norm(getVal(c, 'ID_Keluarga')) === norm(getVal(f, 'ID_Keluarga')));
+                        const anakKeluarga = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                         return anakKeluarga.some(c => {
                             const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
                             if (filterProgram === 'Gopay') return p.includes('gopay');
@@ -1713,7 +1732,7 @@ const submitArchiveChildren = async () => {
                     const q = searchQuery.toLowerCase();
                     result = result.filter(f => {
                         const matchKeluarga = (getVal(f, 'NAMA ALM') || '').toLowerCase().includes(q) || (getVal(f, 'NAMA IBU') || '').toLowerCase().includes(q);
-                        const anakKeluarga = data.anak.filter(c => norm(getVal(c, 'ID_Keluarga')) === norm(getVal(f, 'ID_Keluarga')));
+                        const anakKeluarga = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                         const matchAnak = anakKeluarga.some(c => (getVal(c, 'NAMA ANAK') || '').toLowerCase().includes(q));
                         return matchKeluarga || matchAnak;
                     });
@@ -1786,7 +1805,7 @@ const submitArchiveChildren = async () => {
 
             const openEditFamily = (f) => {
                 setRegFamily(f);
-                const relatedChildren = data.anak.filter(c => norm(getVal(c, 'ID_Keluarga')) === norm(getVal(f, 'ID_Keluarga')));
+                const relatedChildren = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                 setRegChildren(relatedChildren.length > 0 ? relatedChildren : []);
                 setRegModal({ open: true, step: 1, mode: 'edit' }); setErrorMsg('');
             };
@@ -2177,7 +2196,7 @@ const submitArchiveChildren = async () => {
                                                 if (!bankCode) return;
                                                 
                                                 const famId = norm(getVal(item, 'ID_Keluarga'));
-                                                const gopayAnakList = data.anak.filter(c => norm(getVal(c, 'ID_Keluarga')) === famId && (getVal(c, 'PROGRAM') || '').toLowerCase().includes('gopay'));
+                                                const gopayAnakList = (anakByKeluargaMap[famId] || []).filter(c => (getVal(c, 'PROGRAM') || '').toLowerCase().includes('gopay'));
                                                 const baseNominal = parseInt(printBaseNominal || 0);
                                                 const bonusNominal = parseInt(printBonusNominal || 0);
                                                 
@@ -2903,7 +2922,7 @@ const submitArchiveChildren = async () => {
                                         <div className="flex flex-col sm:flex-row gap-3">
                                             <div className="relative w-full sm:flex-1">
                                                 <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                                                <input className="w-full bg-[#E0E5EC] border-none pl-12 pr-4 py-3.5 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] transition-all placeholder:text-slate-500 placeholder:font-medium" placeholder="Cari nama keluarga..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                                                <input className="w-full bg-[#E0E5EC] border-none pl-12 pr-4 py-3.5 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] transition-all placeholder:text-slate-500 placeholder:font-medium" placeholder="Cari nama keluarga..." value={searchInput} onChange={e => setSearchInput(e.target.value)} />
                                             </div>
                                             <div className="flex gap-2.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
                                                 {(role === 'admin' || role === 'pengurus' || (role === 'korwil' && allowedRegions.length > 1)) ? (
@@ -3035,7 +3054,7 @@ const submitArchiveChildren = async () => {
                                         const isSelected = selectedForPrint.includes(famId);
                                         const pColor = paperColors[famId] || 'PUTIH';
 
-                                        const anakKeluargaRaw = data.anak.filter(c => norm(getVal(c, 'ID_Keluarga')) === famId);
+                                        const anakKeluargaRaw = anakByKeluargaMap[famId] || [];
                                         let hasGopayFam = false;
                                         let hasSapaFam = false;
                                         anakKeluargaRaw.forEach(c => {
@@ -4018,8 +4037,8 @@ const submitArchiveChildren = async () => {
                                                     <input 
                                                         className="w-full bg-[#E0E5EC] border-none pl-12 pr-4 py-3.5 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] transition-all placeholder:text-slate-500 placeholder:font-medium" 
                                                         placeholder="Ketik nama anak untuk mencari..." 
-                                                        value={searchQuery} 
-                                                        onChange={e => setSearchQuery(e.target.value)} 
+                                                        value={searchInput} 
+                                                        onChange={e => setSearchInput(e.target.value)} 
                                                     />
                                                 </div>
                                                 <button 
@@ -5145,7 +5164,7 @@ const submitArchiveChildren = async () => {
                                         <div className="absolute -top-7 flex items-center justify-center bg-[#E0E5EC] rounded-[24px] p-1.5 shadow-[6px_6px_12px_rgb(163,177,198,0.4),-6px_-6px_12px_rgba(255,255,255,0.6)]">
                                             {/* Tombol Perisai Neumorphism */}
                                             <button 
-                                                onClick={() => { setTab(item.id); setSearchQuery(''); setFilterWilayah(''); setFilterProgram(''); setFilterKategoriAnak(''); setFilterKelas([]); setFilterJenjang([]); setFilterOta(''); }}
+                                                onClick={() => { setTab(item.id); setSearchQuery(''); setSearchInput(''); setFilterWilayah(''); setFilterProgram(''); setFilterKategoriAnak(''); setFilterKelas([]); setFilterJenjang([]); setFilterOta(''); }}
                                                 className={`flex items-center justify-center w-[60px] h-[42px] rounded-[18px] active:scale-95 transition-all relative outline-none ${isActive ? 'bg-[#E0E5EC] shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'bg-[#E0E5EC] shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]'}`}
                                             >
                                                 <Icon name={item.icon} size={24} className={isActive ? 'text-red-600' : 'text-red-500'} />
@@ -5164,7 +5183,7 @@ const submitArchiveChildren = async () => {
                             }
 
                             return (
-                                <button key={item.id} onClick={() => { setTab(item.id); setSearchQuery(''); setFilterWilayah(''); setFilterProgram(''); setFilterKategoriAnak(''); setFilterKelas([]); setFilterJenjang([]); setFilterOta(''); }} className="flex flex-col items-center justify-end h-full w-[20%] gap-1.5 relative outline-none">
+                                <button key={item.id} onClick={() => { setTab(item.id); setSearchQuery(''); setSearchInput(''); setFilterWilayah(''); setFilterProgram(''); setFilterKategoriAnak(''); setFilterKelas([]); setFilterJenjang([]); setFilterOta(''); }} className="flex flex-col items-center justify-end h-full w-[20%] gap-1.5 relative outline-none">
                                     {/* Wadah Ikon Tombol Biasa */}
                                     <div className={`flex items-center justify-center w-14 h-[34px] rounded-[14px] transition-all duration-300 ${isActive ? 'bg-[#E0E5EC] text-[#0ea5e9] shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'bg-transparent text-slate-500 hover:text-slate-700'}`}>
                                         <Icon name={item.icon} size={22} className={isActive ? 'stroke-[2.5px]' : 'stroke-2'} />
