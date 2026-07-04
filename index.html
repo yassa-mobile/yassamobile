@@ -734,7 +734,6 @@ const submitArchiveChildren = async () => {
         }
 
         setMsg("✅ Data berhasil diarsipkan!");
-        sendLog(activeUser, role, userWilayah, `Arsip Anak: ID ${archiveModal.selectedChildren.join(', ')} (${finalReason})`);
         
         // Reset tampilan
         setArchiveModal({ open: false, selectedChildren: [], reason: 'BUNDA MENIKAH KEMBALI', manualReason: '' });
@@ -1290,9 +1289,12 @@ const submitArchiveChildren = async () => {
                     if (/Android/i.test(navigator.userAgent)) device = 'Android';
                     else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) device = 'iOS';
                     
+                    // 🆕 Menggunakan Nama Lengkap, jika kosong baru gunakan Nomor HP
+                    const namaLengkap = userFullName || yassaStore.get('yassa-fullname') || uName || 'Tidak Diketahui';
+
                     const logData = {
                         'Waktu': new Date().toLocaleString('id-ID'),
-                        'Username': uName || 'Tidak Diketahui',
+                        'Username': namaLengkap,
                         'Jabatan': uRole || 'Tidak Diketahui',
                         'Wilayah': uWilayah || 'ALL',
                         'Aktivitas': activity,
@@ -1987,12 +1989,8 @@ const submitArchiveChildren = async () => {
                     
                     setMsg("✅ Data berhasil disimpan!");
 
-                    // 🆕 CATAT KE RIWAYAT AKTIVITAS SETIAP KALI SIMPAN/EDIT
-                    if (regModal.mode === 'add') {
-                        sendLog(activeUser, role, userWilayah, `Tambah Data KK Baru: ${familyData['NAMA ALM'] || familyData['NAMA IBU']}`);
-                    } else {
-                        sendLog(activeUser, role, userWilayah, `Merubah Data (Rekening/No HP dll): KK ${familyData['NAMA ALM'] || familyData['NAMA IBU']}`);
-                    }
+                    // Pencatatan ke Riwayat Aktivitas dihapus agar tidak double.
+                    // Tambah/Ubah data otomatis masuk ke Log Perubahan Data dari sisi server.
 
                     setRegModal({ open: false, step: 1, mode: 'add' });
                     refresh(); 
