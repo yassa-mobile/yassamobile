@@ -1378,7 +1378,12 @@ const submitArchiveChildren = async () => {
 
                     if (res && res.success && res.data) {
                         // Backend sudah mengirim data terbaru di atas, tidak perlu reverse lagi
-                        setEditLogs(res.data);
+                        // 🔧 SARING: buang entri LOG_AKTIVITAS (login/aktivitas), modal ini khusus AUDIT TAMBAH/UBAH/HAPUS
+                        const dataBersih = (res.data || []).filter(log => {
+                            const kategori = String(getVal(log, 'Kategori Data') || '').trim().toUpperCase();
+                            return kategori !== 'LOG_AKTIVITAS';
+                        });
+                        setEditLogs(dataBersih);
                     } else {
                         setMsg(`⚠️ Server: ${res?.error || "Gagal memuat log perubahan data."}`);
                         setTimeout(() => setMsg(""), 4000);
