@@ -3620,7 +3620,7 @@ const submitArchiveChildren = async () => {
                                                              rekeningFormat === '' || rekeningFormat === '-';
 
                                             // Ambil daftar anak keluarga terkait
-                                            const targetAnakList = data.anak.filter(c => {
+                                            const targetAnakList = (anakByKeluargaMap[famId] || []).filter(c => {
                                                 if (norm(getVal(c, 'ID_Keluarga')) !== famId) return false;
                                                 const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
                                                 if (filterProgram === 'Gopay') return p.includes('gopay');
@@ -3750,7 +3750,7 @@ const submitArchiveChildren = async () => {
                                                              namaBankFormat === 'TUNAI' || namaBankFormat === 'CASH' || 
                                                              rekeningFormat === '' || rekeningFormat === '-';
 
-                                            const targetAnakList = data.anak.filter(c => {
+                                            const targetAnakList = (anakByKeluargaMap[famId] || []).filter(c => {
                                                 if (norm(getVal(c, 'ID_Keluarga')) !== famId) return false;
                                                 const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
                                                 if (filterProgram === 'Gopay') return p.includes('gopay');
@@ -3979,7 +3979,7 @@ const submitArchiveChildren = async () => {
                                                 if (selectedForPrint.length > 0 && !selectedForPrint.includes(famId)) return false;
                                                 
                                                 // 3. Pastikan keluarga tersebut setidaknya memiliki anak sesuai filter Program
-                                                const targetAnakList = data.anak.filter(c => {
+                                                const targetAnakList = (anakByKeluargaMap[famId] || []).filter(c => {
                                                     if (norm(getVal(c, 'ID_Keluarga')) !== famId) return false;
                                                     const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
                                                     if (filterProgram === 'Gopay') return p.includes('gopay');
@@ -4031,7 +4031,7 @@ const submitArchiveChildren = async () => {
                                                     const famId = norm(getVal(item, 'ID_Keluarga'));
                                                     
                                                     // Ambil daftar anak sesuai filter program
-                                                    const targetAnakList = data.anak.filter(c => {
+                                                    const targetAnakList = (anakByKeluargaMap[famId] || []).filter(c => {
                                                         if (norm(getVal(c, 'ID_Keluarga')) !== famId) return false;
                                                         const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
                                                         if (filterProgram === 'Gopay') return p.includes('gopay');
