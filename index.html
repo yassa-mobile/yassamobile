@@ -621,6 +621,9 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             // STATE ARSIP ANAK BANYAK
             const [archiveModal, setArchiveModal] = useState({ open: false, selectedChildren: [], reason: 'BUNDA MENIKAH KEMBALI', manualReason: '' });
 
+            // 🆕 STATE MODAL RINCIAN KARTU DATA BARU / TLH KELUAR (BERANDA)
+            const [monthDetailModal, setMonthDetailModal] = useState({ open: false, type: '', list: [] });
+
             // STATE APLIKASI
             const [tab, setTab] = useState('home');
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
@@ -662,29 +665,40 @@ const dashboardStats = useMemo(() => {
     let totalKeluar = 0;
     let currentMonthMasuk = 0;
     let currentMonthKeluar = 0;
+    let currentMonthMasukList = [];
+    let currentMonthKeluarList = [];
+
+    // 🆕 PETA KELUARGA LOKAL (untuk ambil WILAYAH & NAMA ALM tiap anak via ID_Keluarga)
+    const famMapLocal = {};
+    (data.keluarga || []).forEach(f => {
+        const idK = String(getVal(f, 'ID_Keluarga') || '').trim().toUpperCase();
+        if (idK) famMapLocal[idK] = f;
+    });
 
     const monthlyData = months.map((m, index) => {
         const monthStr = `${m} ${currentYear}`; // Contoh: "JANUARI 2026"
         const monthNum = String(index + 1).padStart(2, '0');
         const monthHtmlFormat = `${currentYear}-${monthNum}`; // Contoh: "2026-01"
         
-        const masuk = data.anak.filter(c => {
+        const masukAnakArr = data.anak.filter(c => {
             // HANYA CEK KOLOM INI, BUKAN SELURUH DATA ANAK
             const aktif = String(c['AKTIF SANTUNAN GOPAY'] || '').toUpperCase();
             if (!aktif) return false;
             
             // Harus benar-benar mengandung kata "JANUARI 2026" atau "2026-01" di kolom AKTIF SANTUNAN GOPAY
             return aktif.includes(monthStr) || aktif.includes(monthHtmlFormat);
-        }).length;
+        });
+        const masuk = masukAnakArr.length;
 
-        const keluar = (data.arsipAnak || []).filter(c => {
+        const keluarAnakArr = (data.arsipAnak || []).filter(c => {
             // HANYA CEK KOLOM INI
             const tglKeluar = String(c['TANGGAL KELUAR'] || '').toUpperCase();
             if (!tglKeluar) return false;
 
             // Harus benar-benar mengandung "JANUARI 2026" atau "2026-01" di kolom TANGGAL KELUAR
             return tglKeluar.includes(monthStr) || tglKeluar.includes(monthHtmlFormat);
-        }).length;
+        });
+        const keluar = keluarAnakArr.length;
 
         totalMasuk += masuk;
         totalKeluar += keluar;
@@ -692,13 +706,35 @@ const dashboardStats = useMemo(() => {
         if (monthStr === currentMonthStr) {
             currentMonthMasuk = masuk;
             currentMonthKeluar = keluar;
+
+            // 🆕 SUSUN RINCIAN DATA BARU (WILAYAH, NAMA ALM, NAMA ANAK)
+            currentMonthMasukList = masukAnakArr.map(c => {
+                const idK = String(getVal(c, 'ID_Keluarga') || '').trim().toUpperCase();
+                const fam = famMapLocal[idK];
+                return {
+                    namaAnak: getVal(c, 'NAMA ANAK') || '-',
+                    namaAlm: (fam ? getVal(fam, 'NAMA ALM') : '') || getVal(c, 'NAMA ALM') || '-',
+                    wilayah: (fam ? getVal(fam, 'WILAYAH') : '') || getVal(c, 'WILAYAH') || '-'
+                };
+            }).sort((a, b) => a.wilayah.localeCompare(b.wilayah) || a.namaAnak.localeCompare(b.namaAnak));
+
+            // 🆕 SUSUN RINCIAN TELAH KELUAR (WILAYAH, NAMA ALM, NAMA ANAK)
+            currentMonthKeluarList = keluarAnakArr.map(c => {
+                const idK = String(getVal(c, 'ID_Keluarga') || '').trim().toUpperCase();
+                const fam = famMapLocal[idK];
+                return {
+                    namaAnak: getVal(c, 'NAMA ANAK') || '-',
+                    namaAlm: (fam ? getVal(fam, 'NAMA ALM') : '') || getVal(c, 'NAMA ALM') || '-',
+                    wilayah: (fam ? getVal(fam, 'WILAYAH') : '') || getVal(c, 'WILAYAH') || '-'
+                };
+            }).sort((a, b) => a.wilayah.localeCompare(b.wilayah) || a.namaAnak.localeCompare(b.namaAnak));
         }
 
         return { month: m.substring(0,3), masuk, keluar, fullStr: monthStr };
     });
 
-    return { monthlyData, totalMasuk, totalKeluar, currentYear, currentMonthStr, currentMonthMasuk, currentMonthKeluar };
-}, [data.anak, data.arsipAnak]);
+    return { monthlyData, totalMasuk, totalKeluar, currentYear, currentMonthStr, currentMonthMasuk, currentMonthKeluar, currentMonthMasukList, currentMonthKeluarList };
+}, [data.anak, data.arsipAnak, data.keluarga]);
 
 // =================================================================
 // 🆕 FUNGSI TRIGGER PENGARSIPAN BANYAK ANAK
@@ -2201,6 +2237,54 @@ const submitArchiveChildren = async () => {
                     {/* ============================================================ */}
                     {/* 🆕 POPUP ERROR MIDTRANS MERAH — ANTI GAGAL                   */}
                     {/* ============================================================ */}
+                    {/* 🆕 MODAL RINCIAN KARTU DATA BARU / TLH KELUAR (BERANDA) */}
+                    {monthDetailModal.open && (
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 fade-in no-print">
+                            <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                                {/* Header */}
+                                <div className={`${monthDetailModal.type === 'masuk' ? 'bg-emerald-600' : 'bg-rose-600'} p-5 flex items-start justify-between gap-4`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-2.5 rounded-xl shrink-0">
+                                            <Icon name={monthDetailModal.type === 'masuk' ? 'users' : 'database'} size={22} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black text-white text-sm uppercase tracking-wider leading-tight">
+                                                {monthDetailModal.type === 'masuk' ? 'Rincian Data Baru' : 'Rincian Telah Keluar'}
+                                            </h3>
+                                            <p className={`${monthDetailModal.type === 'masuk' ? 'text-emerald-200' : 'text-rose-200'} text-[10px] font-bold mt-0.5 uppercase tracking-widest`}>
+                                                {dashboardStats.currentMonthStr} • {monthDetailModal.list.length} Anak
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setMonthDetailModal({ open: false, type: '', list: [] })} className="bg-white/20 p-2 rounded-xl hover:bg-white/30 transition-all shrink-0 mt-0.5">
+                                        <Icon name="x" size={16} className="text-white" />
+                                    </button>
+                                </div>
+
+                                {/* Daftar Rincian */}
+                                <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                                    {monthDetailModal.list.length === 0 && (
+                                        <div className="p-8 text-center">
+                                            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Tidak ada data bulan ini</p>
+                                        </div>
+                                    )}
+                                    {monthDetailModal.list.map((item, i) => (
+                                        <div key={i} className="px-5 py-3 bg-white hover:bg-slate-50 transition-colors flex items-center gap-3">
+                                            <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black text-white ${monthDetailModal.type === 'masuk' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                                                {i + 1}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-black text-slate-800 text-xs uppercase truncate">{item.namaAnak}</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase truncate">Anak dari Alm. {item.namaAlm}</p>
+                                                <p className="text-[9px] text-sky-600 font-black uppercase tracking-widest mt-0.5">📍 {item.wilayah}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {midtransErrorPopup.open && (
                         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 fade-in no-print">
                             <div className="midtrans-error-popup bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
@@ -2393,8 +2477,11 @@ const submitArchiveChildren = async () => {
                                 {/* KARTU DATA MASUK & KELUAR BULAN INI (Gaya Layar Inset Neumorphism) */}
                                 <div className="flex gap-4 mb-4">
                                     
-                                    {/* KARTU 1: DATA BARU */}
-                                    <div className="flex-1 bg-[#E0E5EC] border-none p-4 rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] flex flex-col gap-3">
+                                    {/* KARTU 1: DATA BARU (Bisa Ditekan untuk Rincian) */}
+                                    <div
+                                        onClick={() => setMonthDetailModal({ open: true, type: 'masuk', list: dashboardStats.currentMonthMasukList })}
+                                        className="flex-1 bg-[#E0E5EC] border-none p-4 rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] flex flex-col gap-3 cursor-pointer active:scale-95 transition-all"
+                                    >
                                         {/* Bagian Atas: Ikon & Judul (Timbul) */}
                                         <div className="flex items-center gap-2">
                                             <div className="w-8 h-8 rounded-full bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
@@ -2410,8 +2497,11 @@ const submitArchiveChildren = async () => {
                                         </div>
                                     </div>
 
-                                    {/* KARTU 2: TELAH KELUAR */}
-                                    <div className="flex-1 bg-[#E0E5EC] border-none p-4 rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] flex flex-col gap-3">
+                                    {/* KARTU 2: TELAH KELUAR (Bisa Ditekan untuk Rincian) */}
+                                    <div
+                                        onClick={() => setMonthDetailModal({ open: true, type: 'keluar', list: dashboardStats.currentMonthKeluarList })}
+                                        className="flex-1 bg-[#E0E5EC] border-none p-4 rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] flex flex-col gap-3 cursor-pointer active:scale-95 transition-all"
+                                    >
                                         {/* Bagian Atas: Ikon & Judul (Timbul) */}
                                         <div className="flex items-center gap-2">
                                             <div className="w-8 h-8 rounded-full bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
