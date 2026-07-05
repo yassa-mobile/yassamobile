@@ -1889,10 +1889,14 @@ const submitArchiveChildren = async () => {
 
                 setMsg("⏳ Menyiapkan file Excel...");
 
-                // --- SHEET 1: DATA KK ---
-                const headerKK = ['ID_Keluarga', ...KELUARGA_FIELDS.map(f => f.key)];
+                // --- SHEET 1: DATA KK (+ JUMLAH ANAK TERDATA = hitung asli dari data anak yang terhubung,
+                //     dipisah dari field 'JUMLAH ANAK' bawaan form yang diisi manual oleh admin,
+                //     supaya bisa ketahuan kalau ada selisih/tidak sinkron) ---
+                const headerKK = ['ID_Keluarga', 'JUMLAH ANAK TERDATA', ...KELUARGA_FIELDS.map(f => f.key)];
                 const rowsKK = sumberKeluarga.map(f => {
-                    const row = { 'ID_Keluarga': getVal(f, 'ID_Keluarga') || '' };
+                    const famId = norm(getVal(f, 'ID_Keluarga'));
+                    const jumlahAnakTerdata = (anakByKeluargaMap[famId] || []).length;
+                    const row = { 'ID_Keluarga': getVal(f, 'ID_Keluarga') || '', 'JUMLAH ANAK TERDATA': jumlahAnakTerdata };
                     KELUARGA_FIELDS.forEach(fld => { row[fld.key] = getVal(f, fld.key) || ''; });
                     return row;
                 });
@@ -1934,7 +1938,7 @@ const submitArchiveChildren = async () => {
                 sendLog(activeUser, role, userWilayah, `Export Excel Data KK & Anak (${printWilayah}, ${rowsKK.length} KK, ${rowsAnak.length} Anak)`);
                 setMsg(`✅ Excel berhasil diunduh! (${rowsKK.length} KK, ${rowsAnak.length} Anak)`);
                 setTimeout(() => setMsg(""), 4000);
-            }, [filteredKeluarga, data.keluarga, data.anak, familyLookupMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
+            }, [filteredKeluarga, data.keluarga, data.anak, familyLookupMap, anakByKeluargaMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
 
             // UPDATE: MEMASUKAN LOGIKA FILTER MULTI-SELECT KELAS, JENJANG SEKOLAH, & OTA
             const filteredAnak = useMemo(() => {
