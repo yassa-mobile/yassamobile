@@ -681,6 +681,17 @@ const dashboardStats = useMemo(() => {
         if (idK) famMapLocal[idK] = f;
     });
 
+    // 🆕 FILTER WILAYAH UNTUK KORWIL: statistik hanya menghitung wilayah yang jadi tanggung jawabnya
+    const allowedWilayahForStats = (role === 'korwil' && userWilayah)
+        ? userWilayah.split(',').map(w => w.trim().toUpperCase()).filter(Boolean)
+        : null;
+
+    const getAnakWilayah = (c) => {
+        const idK = String(getVal(c, 'ID_Keluarga') || '').trim().toUpperCase();
+        const fam = famMapLocal[idK];
+        return ((fam ? getVal(fam, 'WILAYAH') : '') || getVal(c, 'WILAYAH') || '').trim().toUpperCase();
+    };
+
     const monthlyData = months.map((m, index) => {
         const monthStr = `${m} ${currentYear}`; // Contoh: "JANUARI 2026"
         const monthNum = String(index + 1).padStart(2, '0');
@@ -692,7 +703,12 @@ const dashboardStats = useMemo(() => {
             if (!aktif) return false;
             
             // Harus benar-benar mengandung kata "JANUARI 2026" atau "2026-01" di kolom AKTIF SANTUNAN GOPAY
-            return aktif.includes(monthStr) || aktif.includes(monthHtmlFormat);
+            if (!(aktif.includes(monthStr) || aktif.includes(monthHtmlFormat))) return false;
+
+            // 🆕 KORWIL HANYA LIHAT WILAYAHNYA SENDIRI
+            if (allowedWilayahForStats && !allowedWilayahForStats.includes(getAnakWilayah(c))) return false;
+
+            return true;
         });
         const masuk = masukAnakArr.length;
 
@@ -702,7 +718,12 @@ const dashboardStats = useMemo(() => {
             if (!tglKeluar) return false;
 
             // Harus benar-benar mengandung "JANUARI 2026" atau "2026-01" di kolom TANGGAL KELUAR
-            return tglKeluar.includes(monthStr) || tglKeluar.includes(monthHtmlFormat);
+            if (!(tglKeluar.includes(monthStr) || tglKeluar.includes(monthHtmlFormat))) return false;
+
+            // 🆕 KORWIL HANYA LIHAT WILAYAHNYA SENDIRI
+            if (allowedWilayahForStats && !allowedWilayahForStats.includes(getAnakWilayah(c))) return false;
+
+            return true;
         });
         const keluar = keluarAnakArr.length;
 
@@ -740,7 +761,7 @@ const dashboardStats = useMemo(() => {
     });
 
     return { monthlyData, totalMasuk, totalKeluar, currentYear, currentMonthStr, currentMonthMasuk, currentMonthKeluar, currentMonthMasukList, currentMonthKeluarList };
-}, [data.anak, data.arsipAnak, data.keluarga]);
+}, [data.anak, data.arsipAnak, data.keluarga, role, userWilayah]);
 
 // =================================================================
 // 🆕 FUNGSI TRIGGER PENGARSIPAN BANYAK ANAK
