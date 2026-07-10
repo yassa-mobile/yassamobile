@@ -1091,6 +1091,47 @@ const submitArchiveChildren = async () => {
             // STATE UNTUK NOTIFIKASI SALIN/COPY
             const [copiedBank, setCopiedBank] = useState(null);
 
+            // 🟢 STATE & FUNGSI WA MASSAL FONNTE
+            const [waModalOpen, setWaModalOpen] = useState(false);
+            const [waTargetKelas, setWaTargetKelas] = useState('12');
+            const [waPesan, setWaPesan] = useState('Assalamualaikum Ibu/Bapak [NAMA_ALM].\n\nKami dari Yayasan Salam Satu Aspal ingin mengonfirmasi status pendidikan ananda [NAMA_ANAK] yang saat ini tercatat di kelas [KELAS_TARGET]. Apakah saat ini ananda sudah lulus atau masih proses belajar?\n\nTerima kasih atas konfirmasinya.');
+            const [waLoading, setWaLoading] = useState(false);
+
+            const handleBroadcastWA = async () => {
+                if (!waPesan.trim()) {
+                    setMsg('⚠️ Pesan tidak boleh kosong!');
+                    setTimeout(() => setMsg(""), 3000);
+                    return;
+                }
+                const konfirmasi = window.confirm(`Yakin ingin mengirim WA Massal ke anak dengan target Kelas: ${waTargetKelas}?`);
+                if (!konfirmasi) return;
+
+                setWaLoading(true);
+                setMsg('⏳ Sedang memproses WA Massal...');
+                try {
+                    const token = yassaStore.get('yassa-token') || '';
+                    const pesanFinal = waPesan.replace(/\[KELAS_TARGET\]/g, waTargetKelas);
+                    
+                    const payload = {
+                        action: 'broadcastWa',
+                        targetKelas: waTargetKelas,
+                        pesanTemplate: pesanFinal,
+                        token: token
+                    };
+                    const res = await postApi(payload);
+                    if (res && res.success) {
+                        setMsg(`✅ Berhasil: ${res.result}`);
+                        setWaModalOpen(false);
+                    } else {
+                        setMsg(`❌ Gagal: ${res.error || 'Terjadi kesalahan'}`);
+                    }
+                } catch (error) {
+                    setMsg('❌ Error koneksi saat memproses WA Massal');
+                }
+                setWaLoading(false);
+                setTimeout(() => setMsg(""), 5000);
+            };
+
 
             // STATE AUTO UPDATE CHECKER
             const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -2415,6 +2456,76 @@ const submitArchiveChildren = async () => {
                 <div id="main-app-container" className="h-screen flex flex-col bg-[#E0E5EC] overflow-hidden relative print-container">
 
                     {/* ============================================================ */}
+                    {/* 🟢 MODAL WA MASSAL FONNTE                                    */}
+                    {/* ============================================================ */}
+                    {waModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[400] flex items-center justify-center p-4 fade-in no-print">
+                            <div className="bg-[#E0E5EC] w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="bg-purple-600 p-5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-2.5 rounded-xl shrink-0">
+                                            <Icon name="send" size={22} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black text-white text-sm uppercase tracking-wider leading-tight">Broadcast WA</h3>
+                                            <p className="text-purple-200 text-[10px] font-bold mt-0.5 uppercase tracking-widest">Pesan otomatis via Fonnte</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setWaModalOpen(false)} className="bg-white/20 p-2 rounded-xl hover:bg-white/30 transition-all shrink-0">
+                                        <Icon name="x" size={16} className="text-white" />
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Pilih Target Berdasarkan Kelas</label>
+                                        <select 
+                                            value={waTargetKelas}
+                                            onChange={e => setWaTargetKelas(e.target.value)}
+                                            className="w-full bg-[#E0E5EC] border-none px-4 py-3 rounded-xl text-xs font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-slate-700"
+                                        >
+                                            <option value="SEMUA">SEMUA KELAS</option>
+                                            <option value="TK">TK</option>
+                                            <option value="1">Kelas 1</option>
+                                            <option value="2">Kelas 2</option>
+                                            <option value="3">Kelas 3</option>
+                                            <option value="4">Kelas 4</option>
+                                            <option value="5">Kelas 5</option>
+                                            <option value="6">Kelas 6</option>
+                                            <option value="7">Kelas 7</option>
+                                            <option value="8">Kelas 8</option>
+                                            <option value="9">Kelas 9</option>
+                                            <option value="10">Kelas 10</option>
+                                            <option value="11">Kelas 11</option>
+                                            <option value="12">Kelas 12</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Isi Pesan WA</label>
+                                        <textarea 
+                                            value={waPesan}
+                                            onChange={e => setWaPesan(e.target.value)}
+                                            rows={8}
+                                            className="w-full bg-[#E0E5EC] border-none px-4 py-3 rounded-xl text-xs font-medium outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-slate-700 resize-none leading-relaxed"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-2 font-bold leading-relaxed">
+                                            💡 Ketik kata ajaib <span className="text-purple-600 bg-purple-50 px-1 rounded">[NAMA_ANAK]</span>, <span className="text-purple-600 bg-purple-50 px-1 rounded">[NAMA_ALM]</span>, atau <span className="text-purple-600 bg-purple-50 px-1 rounded">[KELAS_TARGET]</span> untuk memanggil data secara otomatis.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="p-5 border-t border-slate-200/50 bg-[#E0E5EC]">
+                                    <button 
+                                        onClick={handleBroadcastWA}
+                                        disabled={waLoading}
+                                        className={`w-full py-4 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${waLoading ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 hover:bg-purple-700 active:scale-95'}`}
+                                    >
+                                        {waLoading ? 'Memproses...' : <><Icon name="send" size={16} /> Mulai Kirim WA Massal</>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ============================================================ */}
                     {/* 🆕 POPUP ERROR MIDTRANS MERAH — ANTI GAGAL                   */}
                     {/* ============================================================ */}
                     {/* 🆕 MODAL RINCIAN KARTU DATA BARU / TLH KELUAR (BERANDA) */}
@@ -3195,6 +3306,23 @@ const submitArchiveChildren = async () => {
                                             </div>
                                         )}
                                     </div>
+                                )}
+
+                                {/* 🟢 [BARU] TOMBOL BUKA MODAL WA MASSAL (HANYA ADMIN) */}
+                                {role === 'admin' && (
+                                    <button
+                                        onClick={() => setWaModalOpen(true)}
+                                        className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all p-6 flex items-center gap-5 text-left mt-5"
+                                    >
+                                        <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                            <Icon name="message-circle" size={24} className="text-purple-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-black text-slate-800 text-sm uppercase tracking-wide">Broadcast WA</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">Kirim pesan massal via Fonnte</p>
+                                        </div>
+                                        <Icon name="chevron-right" size={18} className="text-slate-400 shrink-0" />
+                                    </button>
                                 )}
 
                             </div>
