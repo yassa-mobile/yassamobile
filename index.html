@@ -916,6 +916,13 @@ const submitArchiveChildren = async () => {
             const [editLogs, setEditLogs] = useState([]);
             const [loadingEditLogs, setLoadingEditLogs] = useState(false);
 
+            // STATE LAPORAN PENGIRIMAN WA (Siapa saja yang gagal/berhasil terkirim)
+            const [waReportModalOpen, setWaReportModalOpen] = useState(false);
+            const [waReportData, setWaReportData] = useState([]);
+            const [loadingWaReport, setLoadingWaReport] = useState(false);
+            const [waReportFilterBatch, setWaReportFilterBatch] = useState('SEMUA');
+            const [waReportFilterStatus, setWaReportFilterStatus] = useState('SEMUA');
+
             // ============================================================
             // 🛡️ STATE TAB PERISAI (SECURITY DASHBOARD)
             // ============================================================
@@ -1491,6 +1498,28 @@ const submitArchiveChildren = async () => {
                     setTimeout(() => setMsg(""), 4000);
                 }
                 setLoadingEditLogs(false);
+            };
+
+            // LAPORAN PENGIRIMAN WA — siapa saja yang gagal/berhasil terkirim WA-nya
+            const fetchWaReport = async () => {
+                setLoadingWaReport(true);
+                try {
+                    const tkn = yassaStore.get('yassa-token') || '';
+                    const res = await postApi({ action: 'getLaporanPengirimanWa', limit: 500, token: tkn });
+
+                    if (res && res.success && res.data) {
+                        setWaReportData(res.data);
+                        setWaReportFilterBatch('SEMUA');
+                        setWaReportFilterStatus('SEMUA');
+                    } else {
+                        setMsg(`⚠️ Server: ${res?.error || "Gagal memuat laporan pengiriman WA."}`);
+                        setTimeout(() => setMsg(""), 4000);
+                    }
+                } catch (e) {
+                    setMsg("⚠️ Koneksi error saat mengambil laporan pengiriman WA.");
+                    setTimeout(() => setMsg(""), 4000);
+                }
+                setLoadingWaReport(false);
             };
             useEffect(() => { if (role) { refresh(); fetchBankDictionary(); fetchSystemStatus(); } }, [role, refresh, fetchBankDictionary, fetchSystemStatus]);
 
@@ -4948,6 +4977,21 @@ const submitArchiveChildren = async () => {
                                                 <Icon name="chevron-right" size={16} className="text-slate-400 shrink-0" />
                                             </button>
                                         )}
+
+                                        {role === 'admin' && (
+                                            <button onClick={() => { setWaReportModalOpen(true); fetchWaReport(); }} className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-300/20 active:bg-slate-300/40 transition-all outline-none">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 bg-[#E0E5EC] rounded-2xl flex items-center justify-center shadow-[inset_2px_2px_4px_rgb(163,177,198,0.5),inset_-2px_-2px_4px_rgba(255,255,255,0.6)] shrink-0">
+                                                        <Icon name="send" size={18} className="text-emerald-600" />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Laporan Pengiriman</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Status kirim WA: berhasil / gagal</p>
+                                                    </div>
+                                                </div>
+                                                <Icon name="chevron-right" size={16} className="text-slate-400 shrink-0" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -5677,6 +5721,124 @@ const submitArchiveChildren = async () => {
                         </div>
                     )}
 
+
+                    {/* MODAL LAPORAN PENGIRIMAN WA (Siapa saja yang gagal/berhasil terkirim) */}
+                    {waReportModalOpen && (() => {
+                        const waBatchList = [];
+                        const seenBatch = {};
+                        waReportData.forEach(r => {
+                            const b = getVal(r, 'ID Batch') || '-';
+                            if (!seenBatch[b]) {
+                                seenBatch[b] = true;
+                                waBatchList.push({
+                                    id: b,
+                                    waktu: getVal(r, 'Waktu') || '-',
+                                    kelas: getVal(r, 'Target Kelas') || '-',
+                                    admin: getVal(r, 'Admin') || '-'
+                                });
+                            }
+                        });
+                        const waFiltered = waReportData.filter(r => {
+                            const batchOk = waReportFilterBatch === 'SEMUA' || getVal(r, 'ID Batch') === waReportFilterBatch;
+                            const statusOk = waReportFilterStatus === 'SEMUA' || (getVal(r, 'Status') || '').toString().toUpperCase() === waReportFilterStatus;
+                            return batchOk && statusOk;
+                        });
+                        const totalBerhasil = waFiltered.filter(r => (getVal(r, 'Status') || '').toString().toUpperCase() === 'BERHASIL').length;
+                        const totalGagal = waFiltered.filter(r => (getVal(r, 'Status') || '').toString().toUpperCase() === 'GAGAL').length;
+
+                        return (
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] p-4 flex items-center justify-center fade-in no-print">
+                            <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col h-[85vh]">
+                                <div className="p-5 border-b bg-slate-50 flex justify-between items-center shrink-0">
+                                    <div>
+                                        <h3 className="font-black text-slate-800 uppercase text-sm tracking-wider">Laporan Pengiriman</h3>
+                                        <p className="text-[9px] font-bold text-slate-500 mt-1 uppercase tracking-widest">Status Kirim WA Massal (Fonnte)</p>
+                                    </div>
+                                    <button onClick={() => setWaReportModalOpen(false)} className="p-2 bg-white rounded-full shadow-sm active:scale-95 border border-slate-200"><Icon name="x" size={16}/></button>
+                                </div>
+
+                                {/* FILTER BATCH & STATUS */}
+                                {!loadingWaReport && waReportData.length > 0 && (
+                                    <div className="px-4 py-3 bg-slate-50 border-b shrink-0 space-y-2">
+                                        <select
+                                            value={waReportFilterBatch}
+                                            onChange={e => setWaReportFilterBatch(e.target.value)}
+                                            className="w-full text-[10px] font-bold uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none"
+                                        >
+                                            <option value="SEMUA">Semua Sesi Kirim ({waBatchList.length})</option>
+                                            {waBatchList.map(b => (
+                                                <option key={b.id} value={b.id}>{b.waktu} • Kelas {b.kelas} • {b.admin}</option>
+                                            ))}
+                                        </select>
+                                        <div className="flex gap-2">
+                                            {['SEMUA', 'BERHASIL', 'GAGAL'].map(st => (
+                                                <button
+                                                    key={st}
+                                                    onClick={() => setWaReportFilterStatus(st)}
+                                                    className={`flex-1 text-[9px] font-black uppercase tracking-wider py-2 rounded-xl border transition-all ${waReportFilterStatus === st ? (st === 'GAGAL' ? 'bg-rose-600 text-white border-rose-600' : st === 'BERHASIL' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-800 text-white border-slate-800') : 'bg-white text-slate-500 border-slate-200'}`}
+                                                >
+                                                    {st}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="flex-1 bg-emerald-50 rounded-xl px-3 py-2 text-center">
+                                                <p className="text-[14px] font-black text-emerald-700">{totalBerhasil}</p>
+                                                <p className="text-[8px] font-bold text-emerald-600 uppercase tracking-widest">Berhasil</p>
+                                            </div>
+                                            <div className="flex-1 bg-rose-50 rounded-xl px-3 py-2 text-center">
+                                                <p className="text-[14px] font-black text-rose-700">{totalGagal}</p>
+                                                <p className="text-[8px] font-bold text-rose-600 uppercase tracking-widest">Gagal</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="p-0 overflow-y-auto flex-1 bg-slate-100">
+                                    {loadingWaReport ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                                            <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-3"></div>
+                                            <span className="text-[10px] font-black tracking-widest uppercase">Memuat Laporan...</span>
+                                        </div>
+                                    ) : waFiltered.length > 0 ? (
+                                        <div className="divide-y divide-slate-200">
+                                            {waFiltered.map((log, i) => {
+                                                const status = (getVal(log, 'Status') || '-').toString().toUpperCase();
+                                                const gagal = status === 'GAGAL';
+                                                return (
+                                                    <div key={i} className="bg-white p-4 hover:bg-slate-50 transition-colors">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded tracking-widest uppercase ${gagal ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                                {gagal ? '❌ GAGAL' : '✅ BERHASIL'}
+                                                            </span>
+                                                            <span className="text-[9px] font-bold text-slate-400">{getVal(log, 'Waktu') || '-'}</span>
+                                                        </div>
+                                                        <p className="text-[11px] font-black text-slate-800 uppercase">
+                                                            {getVal(log, 'Nama Anak') || '-'}
+                                                            <span className="text-slate-400 font-normal"> ({getVal(log, 'Tipe') || '-'})</span>
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-600 font-bold mt-1">
+                                                            Alm. {getVal(log, 'Nama Alm') || '-'} • {getVal(log, 'Wilayah') || '-'}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-500 font-bold mt-1">
+                                                            No HP: {getVal(log, 'No HP') || '-'} • Kelas: {getVal(log, 'Target Kelas') || '-'}
+                                                        </p>
+                                                        <p className={`text-[9px] font-semibold mt-2 italic ${gagal ? 'text-rose-500' : 'text-slate-400'}`}>
+                                                            {getVal(log, 'Keterangan') || '-'}
+                                                        </p>
+                                                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-2">Admin: {getVal(log, 'Admin') || '-'}</p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full text-slate-400 text-[10px] font-black uppercase text-center px-8">Belum ada riwayat pengiriman WA. Kirim WA Massal dulu lewat menu di atas.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        );
+                    })()}
 
                     <nav className="fixed bottom-0 left-0 right-0 bg-[#E0E5EC] border-none flex justify-around items-end shadow-[0_-6px_16px_rgb(163,177,198,0.5),0_-6px_16px_rgba(255,255,255,0.7)] z-40 h-[75px] pb-2 px-2 shrink-0 no-print">
                         {[ 
