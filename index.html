@@ -681,17 +681,6 @@ const dashboardStats = useMemo(() => {
         if (idK) famMapLocal[idK] = f;
     });
 
-    // 🆕 FILTER WILAYAH UNTUK KORWIL: statistik hanya menghitung wilayah yang jadi tanggung jawabnya
-    const allowedWilayahForStats = (role === 'korwil' && userWilayah)
-        ? userWilayah.split(',').map(w => w.trim().toUpperCase()).filter(Boolean)
-        : null;
-
-    const getAnakWilayah = (c) => {
-        const idK = String(getVal(c, 'ID_Keluarga') || '').trim().toUpperCase();
-        const fam = famMapLocal[idK];
-        return ((fam ? getVal(fam, 'WILAYAH') : '') || getVal(c, 'WILAYAH') || '').trim().toUpperCase();
-    };
-
     const monthlyData = months.map((m, index) => {
         const monthStr = `${m} ${currentYear}`; // Contoh: "JANUARI 2026"
         const monthNum = String(index + 1).padStart(2, '0');
@@ -703,12 +692,7 @@ const dashboardStats = useMemo(() => {
             if (!aktif) return false;
             
             // Harus benar-benar mengandung kata "JANUARI 2026" atau "2026-01" di kolom AKTIF SANTUNAN GOPAY
-            if (!(aktif.includes(monthStr) || aktif.includes(monthHtmlFormat))) return false;
-
-            // 🆕 KORWIL HANYA LIHAT WILAYAHNYA SENDIRI
-            if (allowedWilayahForStats && !allowedWilayahForStats.includes(getAnakWilayah(c))) return false;
-
-            return true;
+            return aktif.includes(monthStr) || aktif.includes(monthHtmlFormat);
         });
         const masuk = masukAnakArr.length;
 
@@ -718,12 +702,7 @@ const dashboardStats = useMemo(() => {
             if (!tglKeluar) return false;
 
             // Harus benar-benar mengandung "JANUARI 2026" atau "2026-01" di kolom TANGGAL KELUAR
-            if (!(tglKeluar.includes(monthStr) || tglKeluar.includes(monthHtmlFormat))) return false;
-
-            // 🆕 KORWIL HANYA LIHAT WILAYAHNYA SENDIRI
-            if (allowedWilayahForStats && !allowedWilayahForStats.includes(getAnakWilayah(c))) return false;
-
-            return true;
+            return tglKeluar.includes(monthStr) || tglKeluar.includes(monthHtmlFormat);
         });
         const keluar = keluarAnakArr.length;
 
@@ -761,7 +740,42 @@ const dashboardStats = useMemo(() => {
     });
 
     return { monthlyData, totalMasuk, totalKeluar, currentYear, currentMonthStr, currentMonthMasuk, currentMonthKeluar, currentMonthMasukList, currentMonthKeluarList };
-}, [data.anak, data.arsipAnak, data.keluarga, role, userWilayah]);
+}, [data.anak, data.arsipAnak, data.keluarga]);
+
+// 🆕 STATISTIK KHUSUS KARTU PROFIL: total Data Baru & Data Keluar TAHUN INI, dibatasi wilayah Korwil.
+// (dashboardStats di atas SENGAJA tetap global untuk tab Beranda / Statistik 12 Bulan)
+const profileWilayahStats = useMemo(() => {
+    if (role !== 'korwil' || !userWilayah) {
+        return { totalMasuk: dashboardStats.totalMasuk, totalKeluar: dashboardStats.totalKeluar };
+    }
+
+    const allowedWilayahForProfile = userWilayah.split(',').map(w => w.trim().toUpperCase()).filter(Boolean);
+
+    const famMapLocal = {};
+    (data.keluarga || []).forEach(f => {
+        const idK = String(getVal(f, 'ID_Keluarga') || '').trim().toUpperCase();
+        if (idK) famMapLocal[idK] = f;
+    });
+    const getAnakWilayah = (c) => {
+        const idK = String(getVal(c, 'ID_Keluarga') || '').trim().toUpperCase();
+        const fam = famMapLocal[idK];
+        return ((fam ? getVal(fam, 'WILAYAH') : '') || getVal(c, 'WILAYAH') || '').trim().toUpperCase();
+    };
+
+    const totalMasuk = data.anak.filter(c => {
+        const aktif = String(c['AKTIF SANTUNAN GOPAY'] || '').toUpperCase();
+        if (!aktif) return false;
+        return allowedWilayahForProfile.includes(getAnakWilayah(c));
+    }).length;
+
+    const totalKeluar = (data.arsipAnak || []).filter(c => {
+        const tglKeluar = String(c['TANGGAL KELUAR'] || '').toUpperCase();
+        if (!tglKeluar) return false;
+        return allowedWilayahForProfile.includes(getAnakWilayah(c));
+    }).length;
+
+    return { totalMasuk, totalKeluar };
+}, [data.anak, data.arsipAnak, data.keluarga, role, userWilayah, dashboardStats.totalMasuk, dashboardStats.totalKeluar]);
 
 // =================================================================
 // 🆕 FUNGSI TRIGGER PENGARSIPAN BANYAK ANAK
@@ -1972,8 +1986,9 @@ const submitArchiveChildren = async () => {
                 setTimeout(() => setMsg(""), 4000);
             }, [filteredKeluarga, data.keluarga, data.anak, familyLookupMap, anakByKeluargaMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
 
-            // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — HANYA HERUDIN (62817115486) YANG BISA UBAH
-            const isSuperAdminControl = (norm(activeUser) === '62817115486') && ((userFullName || '').trim().toUpperCase() === 'HERUDIN');
+            // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — HANYA HERUDIN (6282112220383) & HERU (62817115486) YANG BISA UBAH
+            const SUPER_ADMIN_CONTROL_NUMBERS = ['6282112220383', '62817115486'];
+            const isSuperAdminControl = SUPER_ADMIN_CONTROL_NUMBERS.includes(norm(activeUser));
 
             const fetchSystemStatus = useCallback(async () => {
                 const tkn = yassaStore.get('yassa-token') || '';
@@ -4683,16 +4698,16 @@ const submitArchiveChildren = async () => {
                                             </span>
                                         </div>
 
-                                        {/* STATISTIK DATA BARU & DATA KELUAR */}
+                                        {/* STATISTIK DATA BARU & DATA KELUAR (khusus wilayah Korwil, admin/pengurus tetap global) */}
                                         <div className="grid grid-cols-2 gap-3 mt-4">
                                             <div className="bg-[#E0E5EC] p-3 rounded-2xl shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] flex flex-col items-center justify-center text-center">
                                                 <Icon name="users" size={14} className="text-emerald-500 mb-1" />
-                                                <p className="text-lg font-black text-slate-700 leading-none mb-1">{dashboardStats.totalMasuk}</p>
+                                                <p className="text-lg font-black text-slate-700 leading-none mb-1">{profileWilayahStats.totalMasuk}</p>
                                                 <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-tight">Data Baru</p>
                                             </div>
                                             <div className="bg-[#E0E5EC] p-3 rounded-2xl shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] flex flex-col items-center justify-center text-center">
                                                 <Icon name="database" size={14} className="text-rose-500 mb-1" />
-                                                <p className="text-lg font-black text-slate-700 leading-none mb-1">{dashboardStats.totalKeluar}</p>
+                                                <p className="text-lg font-black text-slate-700 leading-none mb-1">{profileWilayahStats.totalKeluar}</p>
                                                 <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-tight">Data Keluar</p>
                                             </div>
                                         </div>
@@ -4853,7 +4868,7 @@ const submitArchiveChildren = async () => {
                                                 </p>
                                             ) : (
                                                 <p className="text-[8px] font-bold text-slate-400 text-center uppercase tracking-widest">
-                                                    🔐 Hanya Herudin (Admin Pengendali) yang bisa mengubah pengaturan ini
+                                                    🔐 Hanya Herudin & Heru (Admin Pengendali) yang bisa mengubah pengaturan ini
                                                 </p>
                                             )}
                                         </div>
