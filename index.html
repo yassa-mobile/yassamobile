@@ -744,6 +744,8 @@ const dashboardStats = useMemo(() => {
 
 // 🆕 STATISTIK KHUSUS KARTU PROFIL: total Data Baru & Data Keluar TAHUN INI, dibatasi wilayah Korwil.
 // (dashboardStats di atas SENGAJA tetap global untuk tab Beranda / Statistik 12 Bulan)
+// PERBAIKAN: kriteria pencocokan bulan/tahun HARUS SAMA PERSIS dengan dashboardStats,
+// supaya total per-wilayah tidak pernah lebih besar dari total global.
 const profileWilayahStats = useMemo(() => {
     if (role !== 'korwil' || !userWilayah) {
         return { totalMasuk: dashboardStats.totalMasuk, totalKeluar: dashboardStats.totalKeluar };
@@ -762,17 +764,31 @@ const profileWilayahStats = useMemo(() => {
         return ((fam ? getVal(fam, 'WILAYAH') : '') || getVal(c, 'WILAYAH') || '').trim().toUpperCase();
     };
 
-    const totalMasuk = data.anak.filter(c => {
-        const aktif = String(c['AKTIF SANTUNAN GOPAY'] || '').toUpperCase();
-        if (!aktif) return false;
-        return allowedWilayahForProfile.includes(getAnakWilayah(c));
-    }).length;
+    const months = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+    const currentYear = new Date().getFullYear();
 
-    const totalKeluar = (data.arsipAnak || []).filter(c => {
-        const tglKeluar = String(c['TANGGAL KELUAR'] || '').toUpperCase();
-        if (!tglKeluar) return false;
-        return allowedWilayahForProfile.includes(getAnakWilayah(c));
-    }).length;
+    let totalMasuk = 0;
+    let totalKeluar = 0;
+
+    months.forEach((m, index) => {
+        const monthStr = `${m} ${currentYear}`;
+        const monthNum = String(index + 1).padStart(2, '0');
+        const monthHtmlFormat = `${currentYear}-${monthNum}`;
+
+        totalMasuk += data.anak.filter(c => {
+            const aktif = String(c['AKTIF SANTUNAN GOPAY'] || '').toUpperCase();
+            if (!aktif) return false;
+            if (!(aktif.includes(monthStr) || aktif.includes(monthHtmlFormat))) return false;
+            return allowedWilayahForProfile.includes(getAnakWilayah(c));
+        }).length;
+
+        totalKeluar += (data.arsipAnak || []).filter(c => {
+            const tglKeluar = String(c['TANGGAL KELUAR'] || '').toUpperCase();
+            if (!tglKeluar) return false;
+            if (!(tglKeluar.includes(monthStr) || tglKeluar.includes(monthHtmlFormat))) return false;
+            return allowedWilayahForProfile.includes(getAnakWilayah(c));
+        }).length;
+    });
 
     return { totalMasuk, totalKeluar };
 }, [data.anak, data.arsipAnak, data.keluarga, role, userWilayah, dashboardStats.totalMasuk, dashboardStats.totalKeluar]);
