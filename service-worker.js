@@ -3,6 +3,11 @@
 // Versi: 3.0.0 (Auto-Update)
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
+// 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
+// UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
+// menampilkan angka yang sama di halaman login & menu profil.
+const SW_VERSION = "3.0.0";
+// ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
 // PENTING: Tambahkan kode ini ke service-worker.js yang sudah ada
