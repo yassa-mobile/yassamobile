@@ -384,6 +384,55 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             }
         };
 
+        // KOMPONEN TOMBOL DOKUMEN ARSIP KELUARGA (Manajemen_Arsip)
+        // Menampilkan tombol klik untuk tiap link dokumen + info lokasi fisik & kode berkas.
+        // Data arsip di-input/edit manual langsung di Google Sheet "Manajemen_Arsip".
+        const ArsipDokumenButtons = ({ arsip }) => {
+            if (!arsip) {
+                return (
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-6">
+                        Belum ada data arsip untuk keluarga ini.
+                    </p>
+                );
+            }
+            const dokumen = [
+                { key: 'Link_Arsip', label: 'Folder Arsip', icon: 'database' },
+                { key: 'Link_KK', label: 'Kartu Keluarga', icon: 'file-spreadsheet' },
+                { key: 'Link_Akte', label: 'Akte Kematian', icon: 'file-spreadsheet' },
+                { key: 'Link_KTP_Alm', label: 'KTP Almarhum', icon: 'user' },
+                { key: 'Link_Ktp_Istri', label: 'KTP Istri', icon: 'user' },
+                { key: 'Link_Buku_Tabungan', label: 'Buku Tabungan', icon: 'book-open' },
+            ];
+            const kodeBerkas = getVal(arsip, 'Kode_Berkas_Fisik');
+            const lokasi = getVal(arsip, 'Lokasi_Penyimpanan');
+            return (
+                <div className="space-y-3">
+                    {(kodeBerkas || lokasi) && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-wide">
+                            📍 Lokasi Fisik: {lokasi || '-'} {kodeBerkas ? `(Map ${kodeBerkas})` : ''}
+                        </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                        {dokumen.map(d => {
+                            const link = getVal(arsip, d.key);
+                            if (!link) return null;
+                            return (
+                                <a key={d.key} href={link} target="_blank" rel="noopener noreferrer"
+                                   className="text-[9px] font-black uppercase text-slate-700 bg-slate-100 border border-slate-300 px-3 py-2 rounded-xl shadow-sm hover:bg-slate-200 transition-all flex items-center gap-1.5">
+                                    <Icon name={d.icon} size={11} /> {d.label}
+                                </a>
+                            );
+                        })}
+                    </div>
+                    {dokumen.every(d => !getVal(arsip, d.key)) && (
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-3">
+                            Belum ada link dokumen yang diisi.
+                        </p>
+                    )}
+                </div>
+            );
+        };
+
         // KOMPONEN MULTI SELECT (Untuk filter bisa lebih dari 1) (Gaya Neumorphism)
             const MultiSelectFilter = ({ label, options, selectedVals, onChange, theme = 'slate' }) => {
                 const [isOpen, setIsOpen] = useState(false);
@@ -633,9 +682,11 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             // STATE APLIKASI
             const [tab, setTab] = useState('home');
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
-            const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
+            const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [] });
             const [loading, setLoading] = useState(false);
             const [msg, setMsg] = useState('');
+            // STATE BUKA/TUTUP KARTU ARSIP DOKUMEN (per ID_Keluarga) di Katalog Anak
+            const [expandedArsipCard, setExpandedArsipCard] = useState({});
 
 // FUNGSI REFRESH (Diperbarui agar membaca sheet Arsip_Anak)
 const refresh = useCallback(async () => {
@@ -643,16 +694,17 @@ const refresh = useCallback(async () => {
                 setLoading("MENGAMBIL DATA...");
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
-                    const [resK, resA, resP, resInfo, resArsip] = await Promise.all([
+                    const [resK, resA, resP, resInfo, resArsip, resArsipDok] = await Promise.all([
                         postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
                         postApi({ action: 'read', sheet: 'Anak', token: tkn }),
                         postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
                         postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []}))
+                        postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
+                        postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []}))
                     ]);
                     
                     if (resK.success && resA.success) {
-                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [] });
+                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [] });
                     }
                 } catch (e) { 
                     setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
@@ -1382,6 +1434,16 @@ const submitArchiveChildren = async () => {
                 });
                 return map;
             }, [data.anak]);
+
+            // INDEX ARSIP DOKUMEN (Manajemen_Arsip) PER KELUARGA, via ID_Keluarga
+            const arsipByKeluarga = useMemo(() => {
+                const map = {};
+                (data.arsip || []).forEach(a => {
+                    const key = norm(getVal(a, 'ID_Keluarga'));
+                    if (key) map[key] = a; // satu record arsip per keluarga
+                });
+                return map;
+            }, [data.arsip]);
 
             const generatedId = useMemo(() => {
                 if (regModal.mode === 'edit') return regFamily.ID_Keluarga;
@@ -4686,7 +4748,9 @@ const submitArchiveChildren = async () => {
                                     
                                     {/* --- AREA KARTU NAMA ANAK MULAI DI SINI --- */}
                                     {filteredAnak.slice(0, visibleItemsAnak).map((item, i) => {
-                                        const parent = familyLookupMap[norm(getVal(item, 'ID_Keluarga'))];
+                                        const famId = norm(getVal(item, 'ID_Keluarga'));
+                                        const parent = familyLookupMap[famId];
+                                        const arsipKeluarga = arsipByKeluarga[famId];
                                         const namaAlm = parent ? getVal(parent, 'NAMA ALM') : 'TIDAK DIKETAHUI';
                                         const wilayah = parent ? getVal(parent, 'WILAYAH') : '-';
                                         const program = getVal(item, 'PROGRAM');
@@ -4775,32 +4839,22 @@ const submitArchiveChildren = async () => {
                                                         </div>
                                                     )}
 
-                                                    {/* [BARU] BLOK TOMBOL DOKUMEN ARSIP */}
-                                                    <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-slate-200/50">
-                                                        {getVal(item, 'Link_Arsip') && (
-                                                            <a href={getVal(item, 'Link_Arsip')} target="_blank" rel="noopener noreferrer" 
-                                                               className="text-[8px] font-black uppercase text-white bg-blue-600 px-2.5 py-1.5 rounded-lg shadow-sm hover:bg-blue-700 transition-all flex items-center gap-1">
-                                                                <Icon name="database" size={10} /> Folder Arsip
-                                                            </a>
-                                                        )}
-                                                        {getVal(item, 'Link_KK') && (
-                                                            <a href={getVal(item, 'Link_KK')} target="_blank" rel="noopener noreferrer" 
-                                                               className="text-[8px] font-black uppercase text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-1.5 rounded-lg shadow-sm hover:bg-slate-200 transition-all flex items-center gap-1">
-                                                                📄 KK
-                                                            </a>
-                                                        )}
-                                                        {getVal(item, 'Link_Akte') && (
-                                                            <a href={getVal(item, 'Link_Akte')} target="_blank" rel="noopener noreferrer" 
-                                                               className="text-[8px] font-black uppercase text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-1.5 rounded-lg shadow-sm hover:bg-slate-200 transition-all flex items-center gap-1">
-                                                                📄 Akte
-                                                            </a>
-                                                        )}
-                                                        {getVal(item, 'Lokasi_Penyimpanan') && (
-                                                            <span className="text-[8px] font-black uppercase text-slate-500 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-sm flex items-center gap-1">
-                                                                📍 {getVal(item, 'Lokasi_Penyimpanan')}
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    {/* BLOK ARSIP DOKUMEN KELUARGA (dari sheet Manajemen_Arsip, via ID_Keluarga) */}
+                                                    {arsipKeluarga && (
+                                                        <div className="mt-3 pt-2 border-t border-slate-200/50">
+                                                            <button
+                                                                onClick={() => setExpandedArsipCard(prev => ({ ...prev, [famId]: !prev[famId] }))}
+                                                                className="text-[8px] font-black uppercase text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-lg shadow-sm hover:bg-blue-100 transition-all flex items-center gap-1"
+                                                            >
+                                                                <Icon name="database" size={10} /> {expandedArsipCard[famId] ? 'Tutup Arsip Dokumen' : 'Lihat Arsip Dokumen'}
+                                                            </button>
+                                                            {expandedArsipCard[famId] && (
+                                                                <div className="mt-2">
+                                                                    <ArsipDokumenButtons arsip={arsipKeluarga} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
                                                 </div>
                                                 <div className="flex items-center gap-3 shrink-0">
@@ -5991,9 +6045,22 @@ const submitArchiveChildren = async () => {
             className={`flex-1 py-3 px-4 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${regModal.familyTab === 'lainnya' ? 'bg-white text-amber-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>
             📋 Info Lainnya
         </button>
+        <button 
+            onClick={() => setRegModal({...regModal, familyTab: 'arsip'})} 
+            className={`flex-1 py-3 px-4 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${regModal.familyTab === 'arsip' ? 'bg-white text-indigo-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>
+            📁 Arsip Dokumen
+        </button>
     </div>
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm">
+    {(regModal.familyTab || 'profil') === 'arsip' && (
+        <div className="bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4 text-center">
+                Data arsip diisi/diubah langsung di Google Sheet "Manajemen_Arsip"
+            </p>
+            <ArsipDokumenButtons arsip={arsipByKeluarga[norm(regFamily.ID_Keluarga)]} />
+        </div>
+    )}
+    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm ${(regModal.familyTab || 'profil') === 'arsip' ? 'hidden' : ''}`}>
 {typeof KELUARGA_FIELDS !== 'undefined' && KELUARGA_FIELDS.map(f => {
     const fKey = f.key.toUpperCase();
     
@@ -6006,6 +6073,7 @@ const submitArchiveChildren = async () => {
     if (tabAktif === 'profil' && (isRekening || isLainnya)) return null;
     if (tabAktif === 'rekening' && !isRekening) return null;
     if (tabAktif === 'lainnya' && !isLainnya) return null;
+    if (tabAktif === 'arsip') return null;
 
     // Sembunyikan field PENANDAAN KERTAS / WARNA KERTAS di Input Data Baru
     if (f.key.toUpperCase() === 'WARNA KERTAS' || f.key.toUpperCase() === 'PENANDAAN KERTAS') return null;
