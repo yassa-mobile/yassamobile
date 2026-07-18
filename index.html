@@ -5142,18 +5142,27 @@ const submitArchiveChildren = async () => {
                                                 className={`relative w-full max-w-[240px] h-14 rounded-full p-1.5 transition-colors duration-300 shadow-[inset_3px_3px_8px_rgba(0,0,0,0.25),inset_-1px_-1px_4px_rgba(255,255,255,0.15)] ${systemStatus.locked ? 'bg-gradient-to-b from-red-400 to-red-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`}
                                             >
                                                 {/* Label ON/OFF */}
-                                                <div className={`absolute inset-y-0 flex items-center transition-all duration-300 ${systemStatus.locked ? 'right-5' : 'left-5'}`}>
+                                                <div
+                                                    style={systemStatus.locked
+                                                        ? { right: '1.25rem', left: 'auto' }   // OFF -> label di kanan (berlawanan dgn tombol)
+                                                        : { left: '1.25rem', right: 'auto' }}  // ON  -> label di kiri
+                                                    className="absolute inset-y-0 flex items-center transition-all duration-300"
+                                                >
                                                     <span className="text-white font-black text-xs uppercase tracking-widest select-none drop-shadow">
                                                         {systemStatus.locked ? 'OFF' : 'ON'}
                                                     </span>
                                                 </div>
 
-                                                {/* Knob bulat putih yang geser */}
+                                                {/* Knob bulat putih yang geser — ON = kanan, OFF = kiri (dipaksa lewat inline style
+                                                    di atas class Tailwind, supaya posisinya pasti benar apa pun kondisinya) */}
                                                 <button
                                                     onClick={handleToggleSystemLock}
                                                     disabled={systemLockBusy || !isSuperAdminControl}
                                                     aria-label="Toggle Kontrol Sistem"
-                                                    className={`absolute top-1.5 bottom-1.5 aspect-square rounded-full bg-white shadow-[2px_2px_6px_rgba(0,0,0,0.35)] transition-all duration-300 outline-none ${systemStatus.locked ? 'left-1.5' : 'right-1.5'} ${(!isSuperAdminControl || systemLockBusy) ? 'cursor-not-allowed opacity-90' : 'cursor-pointer active:scale-95 hover:brightness-95'}`}
+                                                    style={systemStatus.locked
+                                                        ? { left: '0.375rem', right: 'auto' }   // OFF/Tertutup -> tombol di KIRI
+                                                        : { right: '0.375rem', left: 'auto' }}  // ON/Aktif    -> tombol di KANAN
+                                                    className={`absolute top-1.5 bottom-1.5 aspect-square rounded-full bg-white shadow-[2px_2px_6px_rgba(0,0,0,0.35)] transition-all duration-300 outline-none ${(!isSuperAdminControl || systemLockBusy) ? 'cursor-not-allowed opacity-90' : 'cursor-pointer active:scale-95 hover:brightness-95'}`}
                                                 ></button>
                                             </div>
 
