@@ -354,7 +354,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 localStorage.removeItem(key + '_exp');
             },
             clear: () => {
-                const keys = ['yassa-role','yassa-wilayah','yassa-username','yassa-fullname','yassa-foto','yassa-token','yassa-active-user','yassa-force-pwd'];
+                const keys = ['yassa-role','yassa-wilayah','yassa-username','yassa-fullname','yassa-foto','yassa-token','yassa-active-user','yassa-force-pwd','yassa-super-admin-control'];
                 keys.forEach(k => { localStorage.removeItem(k); localStorage.removeItem(k + '_exp'); });
             }
         }; 
@@ -632,6 +632,9 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [activeUser, setActiveUser] = useState(yassaStore.get('yassa-username') || ''); 
             const [userFullName, setUserFullName] = useState(yassaStore.get('yassa-fullname') || ''); 
             const [userFotoUrl, setUserFotoUrl] = useState(yassaStore.get('yassa-foto') || '');
+            // 🔒 Ditentukan oleh backend saat login (lihat isSuperAdminControl_ di Code.gs),
+            // BUKAN daftar nomor HP di frontend -- supaya nomor admin pengendali tidak bocor.
+            const [isSuperAdminControl, setIsSuperAdminControl] = useState(yassaStore.get('yassa-super-admin-control') === 'true');
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [loginError, setLoginError] = useState('');
@@ -1620,11 +1623,13 @@ const submitArchiveChildren = async () => {
     yassaStore.remove('yassa-active-user');
     yassaStore.remove('yassa-token');
     yassaStore.remove('yassa-foto'); // ← TAMBAHKAN INI
+    yassaStore.remove('yassa-super-admin-control');
     setRole('');
     setUserWilayah('');
     setActiveUser('');
     setUserFullName('');
     setUserFotoUrl(''); // ← TAMBAHKAN INI
+    setIsSuperAdminControl(false);
     setUsername('');
     setPassword('');
     setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
@@ -1748,6 +1753,7 @@ const submitArchiveChildren = async () => {
                             setActiveUser(''); 
                             setUserFullName(''); 
                             setUserFotoUrl('');
+                            setIsSuperAdminControl(false);
                             setUsername(''); 
                             setPassword('');
                             setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
@@ -1803,12 +1809,14 @@ const submitArchiveChildren = async () => {
                     let assignedWilayah = '';
                     let assignedFullName = '';
                     let assignedFotoUrl = '';
+                    let assignedSuperAdminControl = false;
                     if (loginRes && loginRes.success && loginRes.data) {
                         isValid = true;
                         assignedRole = loginRes.data.role;
                         assignedWilayah = loginRes.data.wilayah;
                         assignedFullName = loginRes.data.fullName;
                         assignedFotoUrl = loginRes.data.linkFoto || '';
+                        assignedSuperAdminControl = !!loginRes.data.isSuperAdminControl;
                         if (loginRes.data.token) {
                             yassaStore.set('yassa-token', loginRes.data.token);
                         }
@@ -1817,11 +1825,13 @@ const submitArchiveChildren = async () => {
                     if (isValid) {
                         setRole(assignedRole);
                         setUserWilayah(assignedWilayah); setActiveUser(cleanUsername); setUserFullName(assignedFullName);
+                        setIsSuperAdminControl(assignedSuperAdminControl);
                         yassaStore.set('yassa-role', assignedRole); 
                         yassaStore.set('yassa-wilayah', assignedWilayah);
                         yassaStore.set('yassa-username', cleanUsername);
                         yassaStore.set('yassa-fullname', assignedFullName);
                         yassaStore.set('yassa-active-user', cleanUsername);
+                        yassaStore.set('yassa-super-admin-control', assignedSuperAdminControl ? 'true' : 'false');
                         
                         let finalFotoUrl = assignedFotoUrl ? assignedFotoUrl.toString().trim() : '';
                         if (!finalFotoUrl || finalFotoUrl === '') {
@@ -2147,9 +2157,8 @@ const submitArchiveChildren = async () => {
                 setTimeout(() => setMsg(""), 4000);
             }, [filteredKeluarga, data.keluarga, data.anak, familyLookupMap, anakByKeluargaMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
 
-            // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — HANYA HERUDIN (6282112220383) & HERU (62817115486) YANG BISA UBAH
-            const SUPER_ADMIN_CONTROL_NUMBERS = ['6282112220383', '62817115486'];
-            const isSuperAdminControl = SUPER_ADMIN_CONTROL_NUMBERS.includes(norm(activeUser));
+            // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — isSuperAdminControl datang dari backend
+            // (Code.gs, dikirim saat login), bukan dihitung dari daftar nomor HP di sini.
 
             const fetchSystemStatus = useCallback(async () => {
                 const tkn = yassaStore.get('yassa-token') || '';
@@ -5169,6 +5178,7 @@ const submitArchiveChildren = async () => {
                                         sendLog(activeUser || 'Sistem', role, userWilayah, 'Logout Aplikasi');
                                         yassaStore.clear();
                                         setRole(''); setUserWilayah(''); setActiveUser(''); setUserFullName(''); setUserFotoUrl('');
+                                        setIsSuperAdminControl(false);
                                         setUsername(''); setPassword('');
                                         setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
                                         setTab('home'); window.scrollTo(0,0);
