@@ -1195,6 +1195,19 @@ const submitArchiveChildren = async () => {
             // STATE AUTO UPDATE CHECKER
             const [updateAvailable, setUpdateAvailable] = useState(false);
 
+            // 🚀 VERSI YANG DITAMPILKAN DI APP — diambil dari SW_VERSION di service-worker.js
+            // (fallback ke APP_VERSION selama file service-worker.js belum berhasil diambil)
+            const [swVersion, setSwVersion] = useState(APP_VERSION);
+            useEffect(() => {
+                fetch('service-worker.js?_t=' + new Date().getTime(), { cache: 'no-store' })
+                    .then(res => res.text())
+                    .then(text => {
+                        const match = text.match(/const SW_VERSION = ["']([^"']+)["']/);
+                        if (match && match[1]) setSwVersion(match[1]);
+                    })
+                    .catch(() => {}); // Diamkan saja kalau offline/gagal, tetap pakai fallback
+            }, []);
+
             // FUNGSI BACKGROUND CHECKER VERSI APLIKASI
             useEffect(() => {
                 const checkForUpdate = async () => {
@@ -2489,6 +2502,9 @@ const submitArchiveChildren = async () => {
 
                                     <div className="text-center text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                         © 2026 Yayasan Salam Satu Aspal.<br/>All Rights Reserved.
+                                    </div>
+                                    <div className="text-center text-[8px] font-bold text-slate-300 uppercase tracking-[2px] mt-1.5">
+                                        YASSA Mobile v{swVersion}
                                     </div>
 
                                 </div>
@@ -5163,7 +5179,7 @@ const submitArchiveChildren = async () => {
                                 </button>
 
     {/* Info Versi */}
-    <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-[3px] pb-2">YASSA Mobile v{APP_VERSION}</p>
+    <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-[3px] pb-2">YASSA Mobile v{swVersion}</p>
 
                                 {/* ============================================================ */}
                                 {/* MODAL PERISAI YASSA (Dipindahkan dari Tab Kontrol)           */}
