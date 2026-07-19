@@ -331,6 +331,29 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         };
         let URL_DATABASE_PERMANEN = YASSA_CONFIG.GAS_URL;
 
+        // ⚠️ FALLBACK SAJA -- daftar email korwil "darurat" ini hanya dipakai kalau
+        // sheet "Setting_Korwil" di Google Sheet belum dibuat / masih kosong.
+        // Sumber data yang benar & yang harus di-edit adalah SHEET "Setting_Korwil"
+        // (kolom WILAYAH & EMAIL KORWIL), BUKAN daftar di bawah ini.
+        const KORWIL_EMAIL_FALLBACK = {
+            'BOGOR': 'sugiyatna1234@gmail.com',
+            'DEPOK': 'gjkt.5830@gmail.com',
+            'GRESIK': 'gjkt.5830@gmail.com',
+            'JAKARTA BARAT': 'antonfauz882@gmail.com',
+            'JAKARTA PUSAT': 'antosuyantoo79@gmail.com',
+            'JAKARTA SELATAN': 'hamdaniaki92@gmail.com',
+            'JAKARTA TIMUR': 'andoabdurrahman02@gmail.com',
+            'JAKARTA UTARA': 'hadihidayat822@gmail.com',
+            'KABUPATEN BEKASI': 'arssarisunarya0305@gmail.com',
+            'KOTA BEKASI': 'nugisetiawan28@gmail.com',
+            'SIDOARJO': 'eldeqi78@gmail.com',
+            'SURABAYA': 'eldeqi78@gmail.com',
+            'TANGGERANG KABUPATEN': 'nurcahyadyadigopay0706@gmail.com',
+            'TANGGERANG KOTA': 'alibantol008@gmail.com',
+            'TANGGERANG SELATAN': 'shellacutte266@gmail.com',
+            'TASIKMALAYA': 'thidayatulloh43@gmail.com'
+        };
+
         // ============================================================
         // 🔒 SESSION HELPER — localStorage + expiry 8 jam
         // ============================================================
@@ -898,6 +921,12 @@ const submitArchiveChildren = async () => {
             const [bankDictionary, setBankDictionary] = useState({});
             const [bankDictLoaded, setBankDictLoaded] = useState(false);
 
+            // STATE BARU: KAMUS EMAIL KORWIL PER WILAYAH (dari Google Sheet Setting_Korwil)
+            // Menggantikan daftar email yang sebelumnya hardcode di kode -- sekarang
+            // cukup edit sheet "Setting_Korwil" (kolom WILAYAH & EMAIL KORWIL), tanpa perlu ubah kode.
+            const [korwilEmailMap, setKorwilEmailMap] = useState({});
+            const [korwilEmailLoaded, setKorwilEmailLoaded] = useState(false);
+
             // STATE BARU: POPUP ERROR MIDTRANS (MERAH)
             const [midtransErrorPopup, setMidtransErrorPopup] = useState({ open: false, errors: [] });
 
@@ -1268,6 +1297,43 @@ const submitArchiveChildren = async () => {
                 }
             }, []);
 
+            // FUNGSI: AMBIL KAMUS EMAIL KORWIL DARI SHEET Setting_Korwil (BACKGROUND)
+            // Sheet harus punya kolom "WILAYAH" dan "EMAIL KORWIL" (1 baris per wilayah).
+            // Kalau sheet belum dibuat / masih kosong, fallback pakai KORWIL_EMAIL_FALLBACK
+            // (daftar lama) supaya autofill tetap jalan sementara sheet belum disiapkan.
+            const fetchKorwilEmailMap = useCallback(async () => {
+                if (URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
+                try {
+                    const tkn = yassaStore.get('yassa-token') || '';
+                    const res = await postApi({ action: 'read', sheet: 'Setting_Korwil', token: tkn });
+
+                    if (res.success && res.data && res.data.length > 0) {
+                        const dict = {};
+                        res.data.forEach(row => {
+                            const wilayah = (getVal(row, 'WILAYAH') || '').trim().toUpperCase();
+                            const email   = (getVal(row, 'EMAIL KORWIL') || getVal(row, 'EMAIL_KORWIL') || '').trim();
+                            if (wilayah && email) {
+                                dict[wilayah] = email;
+                            }
+                        });
+                        if (Object.keys(dict).length > 0) {
+                            setKorwilEmailMap(dict);
+                            setKorwilEmailLoaded(true);
+                            console.log(`✅ Kamus email korwil dimuat dari Sheet: ${Object.keys(dict).length} wilayah`);
+                            return;
+                        }
+                    }
+                    // Sheet belum ada / kosong -> pakai fallback lama
+                    setKorwilEmailMap(KORWIL_EMAIL_FALLBACK);
+                    setKorwilEmailLoaded(true);
+                    console.warn("⚠️ Sheet Setting_Korwil kosong/belum ada, memakai daftar email korwil bawaan (fallback).");
+                } catch (e) {
+                    setKorwilEmailMap(KORWIL_EMAIL_FALLBACK);
+                    setKorwilEmailLoaded(true);
+                    console.warn("⚠️ Gagal memuat kamus email korwil dari Sheet Setting_Korwil, memakai fallback:", e);
+                }
+            }, []);
+
             // FUNGSI INTI: SMART BANK CODE RESOLVER
             const resolveBankCode = useCallback((namaBank) => {
                 if (!namaBank) return null;
@@ -1599,7 +1665,7 @@ const submitArchiveChildren = async () => {
                 }
                 setLoadingWaReport(false);
             };
-            useEffect(() => { if (role) { refresh(); fetchBankDictionary(); fetchSystemStatus(); } }, [role, refresh, fetchBankDictionary, fetchSystemStatus]);
+            useEffect(() => { if (role) { refresh(); fetchBankDictionary(); fetchKorwilEmailMap(); fetchSystemStatus(); } }, [role, refresh, fetchBankDictionary, fetchKorwilEmailMap, fetchSystemStatus]);
 
             // Cek ulang status Kontrol Sistem tiap 2 menit, biar semua user langsung tau kalau baru ditutup/dibuka
             useEffect(() => {
@@ -6131,30 +6197,11 @@ return (
                                                                 let updates = { [f.key]: val };
 
                                                                 // Autofill Email Korwil berdasarkan Wilayah yang dipilih
+                                                                // Kamus diambil dari Sheet "Setting_Korwil" (lihat fetchKorwilEmailMap),
+                                                                // jadi kalau email korwil berubah, cukup edit sheet-nya -- tidak perlu ubah kode.
                                                                 if (f.key === 'WILAYAH') {
-                                                                    const emailMap = {
-                                                                        'BOGOR': 'sugiyatna1234@gmail.com',
-                                                                        'DEPOK': 'gjkt.5830@gmail.com',
-                                                                        'GRESIK': 'gjkt.5830@gmail.com',
-                                                                        'JAKARTA BARAT': 'antonfauz882@gmail.com',
-                                                                        'JAKARTA PUSAT': 'antosuyantoo79@gmail.com',
-                                                                        'JAKARTA SELATAN': 'hamdaniaki92@gmail.com',
-                                                                        'JAKARTA TIMUR': 'andoabdurrahman02@gmail.com',
-                                                                        'JAKARTA UTARA': 'hadihidayat822@gmail.com',
-                                                                        'KABUPATEN BEKASI': 'arssarisunarya0305@gmail.com',
-                                                                        'KOTA BEKASI': 'nugisetiawan28@gmail.com',
-                                                                        'SIDOARJO': 'eldeqi78@gmail.com',
-                                                                        'SURABAYA': 'eldeqi78@gmail.com',
-                                                                        'TANGGERANG KABUPATEN': 'nurcahyadyadigopay0706@gmail.com',
-                                                                        'TANGGERANG KOTA': 'alibantol008@gmail.com',
-                                                                        'TANGGERANG SELATAN': 'shellacutte266@gmail.com',
-                                                                        'TASIKMALAYA': 'thidayatulloh43@gmail.com'
-                                                                    };
-                                                                    if (emailMap[val]) {
-                                                                        updates['EMAIL KORWIL'] = emailMap[val];
-                                                                    } else {
-                                                                        updates['EMAIL KORWIL'] = '';
-                                                                    }
+                                                                    const emailKorwilTerpilih = korwilEmailMap[val] || KORWIL_EMAIL_FALLBACK[val] || '';
+                                                                    updates['EMAIL KORWIL'] = emailKorwilTerpilih;
                                                                 }
 
                                                                 setRegFamily({ ...regFamily, ...updates });
