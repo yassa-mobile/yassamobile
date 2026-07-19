@@ -6583,8 +6583,13 @@ return (
         || (typeof yassaStore !== 'undefined' ? yassaStore.get('yassa-username') : null)
         || localStorage.getItem('yassa-username')
         || 'unknown';
+      // 🛡️ Sertakan session token login (bukan cuma username) supaya backend bisa
+      // memverifikasi identitas sebelum mendaftarkan token FCM ini.
+      const sessionToken = (typeof yassaStore !== 'undefined' ? yassaStore.get('yassa-token') : null)
+        || localStorage.getItem('yassa-token')
+        || '';
       const gasUrl = typeof YASSA_CONFIG !== 'undefined' ? YASSA_CONFIG.GAS_URL : '';
-      const params = new URLSearchParams({ action: 'subscribeToken', token, username, ts: Date.now() });
+      const params = new URLSearchParams({ action: 'subscribeToken', token, username, sessionToken, ts: Date.now() });
       await fetch(gasUrl + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
       console.log('[FCM] Token dikirim ke GAS ✅');
     } catch (e) {
