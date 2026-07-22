@@ -708,7 +708,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             // STATE APLIKASI
             const [tab, setTab] = useState('home');
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
-            const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [] });
+            const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [] });
             const [loading, setLoading] = useState(false);
             const [msg, setMsg] = useState('');
             // STATE BUKA/TUTUP KARTU ARSIP DOKUMEN (per ID_Keluarga) di Katalog Anak
@@ -720,17 +720,20 @@ const refresh = useCallback(async () => {
                 setLoading("MENGAMBIL DATA...");
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
-                    const [resK, resA, resP, resInfo, resArsip, resArsipDok] = await Promise.all([
+                    const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop] = await Promise.all([
                         postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
                         postApi({ action: 'read', sheet: 'Anak', token: tkn }),
                         postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
                         postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
                         postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []}))
+                        postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
+                        // 🆕 Riwayat pemilihan "10 Amplop" (dibuat oleh app Pemilihan Kel Alm, sheet sama)
+                        // Dipakai untuk pewarnaan otomatis BIRU/KUNING di Buku Induk.
+                        postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []}))
                     ]);
                     
                     if (resK.success && resA.success) {
-                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [] });
+                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [] });
                     }
                 } catch (e) { 
                     setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
@@ -1497,6 +1500,68 @@ const submitArchiveChildren = async () => {
             }, [filteredKeluarga, data.anak, resolveBankCode, filterWilayah, printMonthInput, printBaseNominal, printBonusNominal, activeUser, role, userWilayah, paperColors]);
 
             const norm = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
+
+            // ============================================================
+            // 🆕 AUTO WARNA BUKU INDUK BERDASARKAN DATA "10 AMPLOP"
+            // Kalau ALM terpilih di app "Pemilihan Kel Alm" (sheet
+            // Riwayat_Pemilihan_Santunan) untuk PERIODE yang sama dengan
+            // yang lagi dicetak di Buku Induk:
+            //   - Kalau REKENING-nya kosong  -> kertas KUNING (amplop tunai)
+            //   - Kalau REKENING-nya ADA     -> nama ALM ditandai BIRU
+            // Manual toggle (klik tombol warna) tetap bisa override hasil auto ini.
+            // ============================================================
+            const BULAN_ID_MAP = {
+                'JANUARI': 1, 'FEBRUARI': 2, 'MARET': 3, 'APRIL': 4, 'MEI': 5, 'JUNI': 6,
+                'JULI': 7, 'AGUSTUS': 8, 'SEPTEMBER': 9, 'OKTOBER': 10, 'NOVEMBER': 11, 'DESEMBER': 12,
+                'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'JUN': 6, 'JUL': 7,
+                'AGU': 8, 'AGT': 8, 'SEP': 9, 'OKT': 10, 'NOV': 11, 'DES': 12
+            };
+            const parsePeriodeToYyyyMM = (text) => {
+                if (!text) return '';
+                const clean = text.toString().toUpperCase().trim();
+                const yearMatch = clean.match(/\b(20\d{2})\b/);
+                if (!yearMatch) return '';
+                let monthNum = null;
+                for (const key in BULAN_ID_MAP) {
+                    if (clean.includes(key)) { monthNum = BULAN_ID_MAP[key]; break; }
+                }
+                if (!monthNum) return '';
+                return `${yearMatch[1]}-${String(monthNum).padStart(2, '0')}`;
+            };
+            const REKENING_KOSONG_LIST = ['NA', 'N/A', 'KOSONG', 'TIDAKADA', 'TIDAKPUNYA', '-', '0'];
+            const isRekeningKosongFE = (rekeningRaw) => {
+                const bersih = (rekeningRaw === null || rekeningRaw === undefined ? '' : rekeningRaw.toString())
+                    .replace(/[\s\-–—.]/g, '').trim().toUpperCase();
+                if (bersih === '') return true;
+                return REKENING_KOSONG_LIST.includes(bersih);
+            };
+            const autoPaperColorMap = useMemo(() => {
+                const map = {};
+                const periodeTarget = parsePeriodeToYyyyMM(printMonthInput);
+                if (!periodeTarget || !data.riwayatAmplop || data.riwayatAmplop.length === 0) return map;
+
+                // Kumpulkan ID_Keluarga yang terpilih amplop pada periode yang sama
+                const idsPeriodeIni = new Set();
+                data.riwayatAmplop.forEach(r => {
+                    let bt = getVal(r, 'Bulan_Tahun');
+                    if (bt instanceof Date) {
+                        bt = `${bt.getFullYear()}-${String(bt.getMonth() + 1).padStart(2, '0')}`;
+                    }
+                    bt = (bt || '').toString().trim();
+                    if (bt !== periodeTarget) return;
+                    const id = norm(getVal(r, 'ID_Keluarga'));
+                    if (id) idsPeriodeIni.add(id);
+                });
+                if (idsPeriodeIni.size === 0) return map;
+
+                // Cek status rekening dari data Keluarga (sumber data paling update)
+                data.keluarga.forEach(item => {
+                    const famId = norm(getVal(item, 'ID_Keluarga'));
+                    if (!idsPeriodeIni.has(famId)) return;
+                    map[famId] = isRekeningKosongFE(getVal(item, 'REKENING')) ? 'KUNING' : 'BIRU';
+                });
+                return map;
+            }, [printMonthInput, data.riwayatAmplop, data.keluarga]);
 
             const familyLookupMap = useMemo(() => {
                 const map = {};
@@ -3752,7 +3817,7 @@ const submitArchiveChildren = async () => {
                                     {filteredKeluarga.slice(0, visibleItemsKeluarga).map((item, i) => {
                                         const famId = norm(getVal(item, 'ID_Keluarga'));
                                         const isSelected = selectedForPrint.includes(famId);
-                                        const pColor = paperColors[famId] || 'PUTIH';
+                                        const pColor = paperColors[famId] || autoPaperColorMap[famId] || 'PUTIH';
 
                                         const anakKeluargaRaw = anakByKeluargaMap[famId] || [];
                                         let hasGopayFam = false;
@@ -3781,7 +3846,7 @@ const submitArchiveChildren = async () => {
                                                             onClick={() => setPaperColors(prev => ({ ...prev, [famId]: pColor === 'PUTIH' ? 'KUNING' : pColor === 'KUNING' ? 'BIRU' : 'PUTIH' }))} 
                                                             className={`px-3 py-2 text-[8px] font-black uppercase rounded-xl border-none transition-all w-[65px] text-center no-print outline-none active:scale-95 ${pColor === 'KUNING' ? 'bg-[#E0E5EC] text-amber-600 shadow-[inset_3px_3px_6px_rgb(163,177,198,0.6),inset_-3px_-3px_6px_rgba(255,255,255,0.8)]' : pColor === 'BIRU' ? 'bg-[#E0E5EC] text-sky-600 shadow-[inset_3px_3px_6px_rgb(163,177,198,0.6),inset_-3px_-3px_6px_rgba(255,255,255,0.8)]' : 'bg-[#E0E5EC] text-slate-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] hover:text-slate-600'}`}
                                                         >
-                                                            {pColor}
+                                                            {pColor}{(!paperColors[famId] && autoPaperColorMap[famId]) ? ' •' : ''}
                                                         </button>
                                                         {role === 'admin' ? (
                                                             <button onClick={() => openEditFamily(item)} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-slate-500 hover:text-green-600 active:scale-95 transition-all outline-none"><Icon name="edit" size={16} /></button>
@@ -3841,7 +3906,7 @@ const submitArchiveChildren = async () => {
                                                             onClick={() => setPaperColors(prev => ({ ...prev, [famId]: pColor === 'PUTIH' ? 'KUNING' : pColor === 'KUNING' ? 'BIRU' : 'PUTIH' }))} 
                                                             className={`px-3 py-1.5 text-[8px] font-black uppercase rounded-lg border shadow-sm transition-all w-[65px] text-center ${pColor === 'KUNING' ? 'bg-amber-100 text-amber-700 border-amber-300' : pColor === 'BIRU' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
                                                         >
-                                                            {pColor}
+                                                            {pColor}{(!paperColors[famId] && autoPaperColorMap[famId]) ? ' •' : ''}
                                                         </button>
                                                         {role === 'admin' ? (
                                                             <button onClick={() => openEditFamily(item)} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-green-600'}`}><Icon name="edit" size={14} /></button>
@@ -4022,7 +4087,7 @@ const submitArchiveChildren = async () => {
 
                                         filteredKeluarga.forEach(item => {
                                             const famId = norm(getVal(item, 'ID_Keluarga'));
-                                            const pColor = paperColors[famId] || 'PUTIH';
+                                            const pColor = paperColors[famId] || autoPaperColorMap[famId] || 'PUTIH';
                                             const warnaKertas = (getVal(item, 'WARNA KERTAS') || '').toUpperCase();
                                             const keterangan = (getVal(item, 'KETERANGAN PEMILIK') || '').toUpperCase();
                                             const namaBankFormat = (getVal(item, 'BANK') || '').toUpperCase();
@@ -4154,7 +4219,7 @@ const submitArchiveChildren = async () => {
 
                                         filteredKeluarga.forEach(item => {
                                             const famId = norm(getVal(item, 'ID_Keluarga'));
-                                            const pColor = paperColors[famId] || 'PUTIH';
+                                            const pColor = paperColors[famId] || autoPaperColorMap[famId] || 'PUTIH';
                                             const warnaKertas = (getVal(item, 'WARNA KERTAS') || '').toUpperCase();
                                             const keterangan = (getVal(item, 'KETERANGAN PEMILIK') || '').toUpperCase();
                                             const namaBankFormat = (getVal(item, 'BANK') || '').toUpperCase();
@@ -4414,7 +4479,7 @@ const submitArchiveChildren = async () => {
 
                                             dataReport.forEach(item => {
                                                 const famId = norm(getVal(item, 'ID_Keluarga'));
-                                                const pColor = paperColors[famId] || 'PUTIH';
+                                                const pColor = paperColors[famId] || autoPaperColorMap[famId] || 'PUTIH';
                                                 const warnaKertas = (getVal(item, 'WARNA KERTAS') || '').toUpperCase();
                                                 const keterangan = (getVal(item, 'KETERANGAN PEMILIK') || '').toUpperCase();
                                                 const namaBankFormat = (getVal(item, 'BANK') || '').toUpperCase();
