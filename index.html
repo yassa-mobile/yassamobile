@@ -5302,6 +5302,19 @@ const submitArchiveChildren = async () => {
                                         {/* VERSI LAYAR (HP/WEB) */}
                                         <div className="no-print space-y-4">
                                             <div className="flex flex-wrap gap-2.5 items-center justify-between bg-[#E0E5EC] p-4 rounded-2xl shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)]">
+                                                {(role === 'admin' || role === 'pengurus' || (role === 'korwil' && allowedRegions.length > 1)) ? (
+                                                    <select
+                                                        className="bg-[#E0E5EC] border-none px-4 py-3 flex-1 min-w-[110px] rounded-2xl text-[10px] font-black outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-sky-600 cursor-pointer"
+                                                        value={filterWilayah}
+                                                        onChange={e => setFilterWilayah(e.target.value)}
+                                                    >
+                                                        <option value="">Semua Wilayah</option>
+                                                        {(role === 'admin' || role === 'pengurus' ? KELUARGA_FIELDS.find(f => f.key === 'WILAYAH').options : allowedRegions).map(o => <option key={o} value={o}>{o}</option>)}
+                                                        {(role === 'admin' || role === 'pengurus') && <option value="LAINNYA">⚠️ LAINNYA</option>}
+                                                    </select>
+                                                ) : (
+                                                    <div className="bg-[#E0E5EC] border-none text-sky-600 px-4 py-3 flex-1 min-w-[110px] rounded-2xl text-[10px] font-black uppercase flex items-center justify-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] truncate">{userWilayah}</div>
+                                                )}
                                                 <select
                                                     className="bg-[#E0E5EC] border-none px-4 py-3 flex-1 min-w-[110px] rounded-2xl text-[10px] font-black outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-purple-600 cursor-pointer"
                                                     value={filterKategoriPrestasi}
