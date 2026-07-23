@@ -5422,6 +5422,21 @@ const submitArchiveChildren = async () => {
                     </div>
                 )}
 
+                {/* Wilayah otomatis ikut data Keluarga si anak (read-only, bukan input manual) */}
+                {prestasiModal.anakId && (() => {
+                    const selectedAnak = data.anak.find(a => getVal(a, 'ID_Anak') === prestasiModal.anakId);
+                    const selectedParent = selectedAnak ? familyLookupMap[norm(getVal(selectedAnak, 'ID_Keluarga'))] : null;
+                    const wilayahAnak = selectedParent ? (getVal(selectedParent, 'WILAYAH') || '-') : '-';
+                    return (
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">Wilayah</label>
+                            <div className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-black text-sky-600 uppercase flex items-center gap-2">
+                                <Icon name="map" size={14} /> {wilayahAnak}
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {PRESTASI_FIELDS.map(f => {
                     if (f.key === 'FOTO_PIAGAM') return null;
                     return (
