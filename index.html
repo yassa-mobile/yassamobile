@@ -220,6 +220,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         { key: 'YATIM', label: 'Yatim?', type: 'select', options: ['YATIM', 'TIDAK'] },
         { key: 'YATIM PIATU', label: 'Yatim Piatu?', type: 'select', options: ['YATIM PIATU', 'TIDAK'] },
         { key: 'DISABILITAS', label: 'Disabilitas?', type: 'select', options: ['DISABILITAS', 'TIDAK'] },
+        { key: 'JENIS DISABILITAS', label: 'Jenis Disabilitas', type: 'select', options: ['Tuna Netra (Gangguan Penglihatan)', 'Tuna Rungu (Gangguan Pendengaran)', 'Tuna Wicara (Gangguan Bicara)', 'Tuna Daksa (Gangguan Fisik/Motorik)', 'Tuna Grahita (Gangguan Intelektual)', 'Tuna Laras (Gangguan Perilaku/Emosi)', 'Autis', 'Down Syndrome', 'Disabilitas Ganda', 'Lainnya'] },
         { key: 'PROGRAM', label: 'Program Bantuan', type: 'select', options: ['GOPAY', 'SAPA'] },
         { key: 'NAMA ORANG TUA ASUH', label: 'Nama Orang Tua Asuh', type: 'text', placeholder: 'Ketik atau Pilih Nama OTA...', datalist: 'otaList' },
         { key: 'AKTIF SANTUNAN GOPAY', label: 'Aktif SANTUNAN Gopay', type: 'text', placeholder: 'Contoh: 08-2024' },
@@ -5182,7 +5183,7 @@ const submitArchiveChildren = async () => {
                                                     <div className="flex flex-wrap gap-1.5 mt-2 mb-1">
                                                         {showYatim && <span className="text-[8px] bg-[#E0E5EC] text-blue-600 px-2 py-1 rounded-lg border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-bold uppercase">Yatim</span>}
                                                         {showPiatu && <span className="text-[8px] bg-[#E0E5EC] text-purple-600 px-2 py-1 rounded-lg border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-bold uppercase">Yatim Piatu</span>}
-                                                        {showDisabilitas && <span className="text-[8px] bg-[#E0E5EC] text-amber-600 px-2 py-1 rounded-lg border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-bold uppercase">Disabilitas</span>}
+                                                        {showDisabilitas && <span className="text-[8px] bg-[#E0E5EC] text-amber-600 px-2 py-1 rounded-lg border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-bold uppercase">Disabilitas{getVal(item, 'JENIS DISABILITAS') ? `: ${getVal(item, 'JENIS DISABILITAS')}` : ''}</span>}
                                                     </div>
 
                                                     {aktifGopay && (
@@ -6887,6 +6888,12 @@ return (
                                                                 
                                                                 // Jika field termasuk field SAPA dan program BUKAN SAPA, sembunyikan form tersebut
                                                                 if (sapaFields.includes(f.key.toUpperCase()) && !currentProgram.includes('SAPA')) {
+                                                                    return null;
+                                                                }
+
+                                                                // 🏥 [BARU] "Jenis Disabilitas" hanya muncul kalau status Disabilitas = DISABILITAS
+                                                                const currentDisabilitas = (child['DISABILITAS'] || '').toUpperCase();
+                                                                if (f.key.toUpperCase() === 'JENIS DISABILITAS' && currentDisabilitas !== 'DISABILITAS') {
                                                                     return null;
                                                                 }
 
