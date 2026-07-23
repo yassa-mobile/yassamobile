@@ -236,7 +236,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         { key: 'PRESTASI', label: 'Prestasi', type: 'text', placeholder: 'Contoh: Juara 1 Marching Band Tingkat Kota' },
         { key: 'TINGKAT', label: 'Tingkat', type: 'select', options: ['Kelas', 'Sekolah', 'Kecamatan', 'Kota/Kabupaten', 'Provinsi', 'Nasional', 'Internasional'] },
         { key: 'TAHUN', label: 'Tahun', type: 'number', placeholder: 'Contoh: 2026' },
-        { key: 'FOTO_PIAGAM', label: 'Link Foto Piagam/Piala (URL)', type: 'text', placeholder: 'Masukkan Link/URL Foto...' },
+        { key: 'FOTO_PIAGAM', label: 'Foto Piagam/Piala', type: 'text' }, // diisi otomatis via tombol upload kamera/galeri di form, bukan input manual
         { key: 'KETERANGAN', label: 'Keterangan (Opsional)', type: 'textarea' },
     ];
 </script>
@@ -984,6 +984,7 @@ const submitArchiveChildren = async () => {
             const [filterTingkatPrestasi, setFilterTingkatPrestasi] = useState('');
             const [prestasiModal, setPrestasiModal] = useState({ open: false, mode: 'add', anakId: '', anakNama: '', data: {} });
             const [savingPrestasi, setSavingPrestasi] = useState(false);
+            const [uploadingFotoPrestasi, setUploadingFotoPrestasi] = useState(false);
 
             // STATE PARAMETER LAPORAN (Periode, Rp Dasar, Rp Bonus)
             // Dipisah jadi versi "Raw" (instan, buat tampilan ketikan) dan versi
@@ -2468,6 +2469,51 @@ const submitArchiveChildren = async () => {
             };
             const openEditPrestasi = (item) => {
                 setPrestasiModal({ open: true, mode: 'edit', anakId: getVal(item, 'ID_Anak'), anakNama: item._namaAnak, data: { ...item } });
+            };
+
+            // 🏆 Upload foto piagam/piala langsung dari kamera/galeri HP ke Google Drive
+            // (memakai action 'uploadImage' backend yang sama seperti upload Foto Anak)
+            const handleUploadFotoPrestasi = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (file.size > 5 * 1024 * 1024) {
+                    setMsg("⚠️ Ukuran foto terlalu besar! Maksimal 5MB.");
+                    setTimeout(() => setMsg(""), 4000);
+                    return;
+                }
+
+                setUploadingFotoPrestasi(true);
+
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onloadend = async () => {
+                    try {
+                        const base64Image = reader.result.split(',')[1];
+                        const payload = {
+                            action: 'uploadPrestasiFile',
+                            base64: base64Image,
+                            mimeType: file.type,
+                            fileName: `YASSA_PRESTASI_${Date.now()}_${file.name}`,
+                            token: yassaStore.get('yassa-token') || ''
+                        };
+                        const res = await fetch(URL_DATABASE_PERMANEN, {
+                            method: 'POST',
+                            body: JSON.stringify(payload)
+                        }).then(r => r.json());
+
+                        if (res.success) {
+                            setPrestasiModal(prev => ({ ...prev, data: { ...prev.data, 'FOTO_PIAGAM': res.url } }));
+                            setMsg("✅ Foto berhasil disimpan ke Google Drive!");
+                        } else {
+                            setMsg(`❌ Gagal Simpan di Drive: ${res.error || 'Server Error'}`);
+                        }
+                    } catch (err) {
+                        setMsg("❌ Error jaringan saat upload foto.");
+                    }
+                    setUploadingFotoPrestasi(false);
+                    setTimeout(() => setMsg(""), 5000);
+                };
             };
 
             const handleSavePrestasi = async () => {
@@ -5296,7 +5342,12 @@ const submitArchiveChildren = async () => {
                                             {prestasiList.map((item, i) => (
                                                 <div key={i} className="bg-[#E0E5EC] rounded-2xl p-4 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] flex gap-3">
                                                     <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-[inset_2px_2px_4px_rgb(163,177,198,0.5),inset_-2px_-2px_4px_rgba(255,255,255,0.8)]">
-                                                        {getVal(item, 'FOTO_PIAGAM') || item._fotoAnak ? (
+                                                        {(getVal(item, 'FOTO_PIAGAM') || '').includes('/file/d/') ? (
+                                                            <a href={getVal(item, 'FOTO_PIAGAM')} target="_blank" rel="noreferrer" className="w-full h-full flex flex-col items-center justify-center text-red-500 gap-0.5">
+                                                                <Icon name="book-open" size={18} />
+                                                                <span className="text-[6px] font-black uppercase">PDF</span>
+                                                            </a>
+                                                        ) : (getVal(item, 'FOTO_PIAGAM') || item._fotoAnak) ? (
                                                             <img src={getVal(item, 'FOTO_PIAGAM') || item._fotoAnak} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-amber-400"><Icon name="award" size={22} /></div>
@@ -5358,7 +5409,9 @@ const submitArchiveChildren = async () => {
                     </div>
                 )}
 
-                {PRESTASI_FIELDS.map(f => (
+                {PRESTASI_FIELDS.map(f => {
+                    if (f.key === 'FOTO_PIAGAM') return null;
+                    return (
                     <div key={f.key}>
                         <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">{f.label}</label>
                         {f.type === 'select' ? (
@@ -5388,7 +5441,36 @@ const submitArchiveChildren = async () => {
                             />
                         )}
                     </div>
-                ))}
+                    );
+                })}
+
+                {/* 📸 Upload Foto Piagam/Piala langsung dari kamera/galeri HP */}
+                <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">Foto / Scan Piagam / Piala</label>
+                    <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
+                            {prestasiModal.data['FOTO_PIAGAM'] ? (
+                                (prestasiModal.data['FOTO_PIAGAM'] || '').includes('/file/d/') ? (
+                                    <a href={prestasiModal.data['FOTO_PIAGAM']} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center text-red-500 gap-0.5">
+                                        <Icon name="book-open" size={20} />
+                                        <span className="text-[7px] font-black uppercase">PDF</span>
+                                    </a>
+                                ) : (
+                                    <img src={prestasiModal.data['FOTO_PIAGAM']} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                                )
+                            ) : (
+                                <Icon name="award" size={22} className="text-slate-300" />
+                            )}
+                        </div>
+                        <label className="flex-1">
+                            <input type="file" accept="image/*,application/pdf" onChange={handleUploadFotoPrestasi} className="hidden" disabled={uploadingFotoPrestasi} />
+                            <div className="w-full text-center py-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-[10px] font-black uppercase tracking-widest cursor-pointer active:scale-[0.98] transition-all">
+                                {uploadingFotoPrestasi ? 'Mengunggah...' : (prestasiModal.data['FOTO_PIAGAM'] ? '📸 Ganti File' : '📸 Ambil Foto / Pilih File')}
+                            </div>
+                        </label>
+                    </div>
+                    <p className="text-[8px] text-slate-400 font-bold mt-1.5 ml-1">Bisa foto (kamera/galeri) atau file PDF hasil scan. Maks 5MB.</p>
+                </div>
             </div>
 
             <div className="flex gap-2.5 mt-6">
