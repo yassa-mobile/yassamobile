@@ -228,6 +228,17 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         { key: 'SANTUNAN SAPA', label: 'Jumlah Santunan SAPA', type: 'text', placeholder: 'Contoh: 500000' },
         { key: 'FOTO ANAK', label: 'Link Foto Anak (URL)', type: 'text', placeholder: 'Masukkan Link/URL Foto...' }
     ];
+
+    // 🏆 [BARU] Field form untuk data Prestasi Anak (sheet: Prestasi_Anak)
+    const PRESTASI_FIELDS = [
+        { key: 'KATEGORI', label: 'Kategori', type: 'select', options: ['Akademik', 'Non Akademik'] },
+        { key: 'BIDANG', label: 'Bidang', type: 'text', placeholder: 'Contoh: Seni, Olahraga, Sains, Sekolah...' },
+        { key: 'PRESTASI', label: 'Prestasi', type: 'text', placeholder: 'Contoh: Juara 1 Marching Band Tingkat Kota' },
+        { key: 'TINGKAT', label: 'Tingkat', type: 'select', options: ['Kelas', 'Sekolah', 'Kecamatan', 'Kota/Kabupaten', 'Provinsi', 'Nasional', 'Internasional'] },
+        { key: 'TAHUN', label: 'Tahun', type: 'number', placeholder: 'Contoh: 2026' },
+        { key: 'FOTO_PIAGAM', label: 'Link Foto Piagam/Piala (URL)', type: 'text', placeholder: 'Masukkan Link/URL Foto...' },
+        { key: 'KETERANGAN', label: 'Keterangan (Opsional)', type: 'textarea' },
+    ];
 </script>
 
     <!-- ====================================================================== -->
@@ -648,7 +659,9 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 'check-circle': <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
                 activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>,
                 history: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></>,
-                'file-spreadsheet': <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></>
+                'file-spreadsheet': <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></>,
+                award: <><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></>,
+                'trash-2': <><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -717,7 +730,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             // STATE APLIKASI
             const [tab, setTab] = useState('home');
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
-            const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [] });
+            const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [], prestasi: [] });
             const [loading, setLoading] = useState(false);
             const [msg, setMsg] = useState('');
             // STATE BUKA/TUTUP KARTU ARSIP DOKUMEN (per ID_Keluarga) di Katalog Anak
@@ -729,7 +742,7 @@ const refresh = useCallback(async () => {
                 setLoading("MENGAMBIL DATA...");
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
-                    const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop] = await Promise.all([
+                    const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi] = await Promise.all([
                         postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
                         postApi({ action: 'read', sheet: 'Anak', token: tkn }),
                         postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
@@ -738,11 +751,13 @@ const refresh = useCallback(async () => {
                         postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
                         // 🆕 Riwayat pemilihan "10 Amplop" (dibuat oleh app Pemilihan Kel Alm, sheet sama)
                         // Dipakai untuk pewarnaan otomatis BIRU/KUNING di Buku Induk.
-                        postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []}))
+                        postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []})),
+                        // 🏆 [BARU] Data prestasi akademik/non-akademik anak asuh
+                        postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []}))
                     ]);
                     
                     if (resK.success && resA.success) {
-                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [] });
+                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] });
                     }
                 } catch (e) { 
                     setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
@@ -962,6 +977,13 @@ const submitArchiveChildren = async () => {
             const [filterJenjang, setFilterJenjang] = useState([]);
 
             const [regionAnalysisFilter, setRegionAnalysisFilter] = useState('');
+
+            // 🏆 [BARU] STATE SUB-TAB "ANAK BERPRESTASI" (di dalam tab Data Anak)
+            const [subTabAnak, setSubTabAnak] = useState('semua'); // 'semua' | 'prestasi'
+            const [filterKategoriPrestasi, setFilterKategoriPrestasi] = useState('');
+            const [filterTingkatPrestasi, setFilterTingkatPrestasi] = useState('');
+            const [prestasiModal, setPrestasiModal] = useState({ open: false, mode: 'add', anakId: '', anakNama: '', data: {} });
+            const [savingPrestasi, setSavingPrestasi] = useState(false);
 
             // STATE PARAMETER LAPORAN (Periode, Rp Dasar, Rp Bonus)
             // Dipisah jadi versi "Raw" (instan, buat tampilan ketikan) dan versi
@@ -1772,7 +1794,7 @@ const submitArchiveChildren = async () => {
     setIsSuperAdminControl(false);
     setUsername('');
     setPassword('');
-    setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
+    setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], prestasi: [] });
     setTab('home');
     window.scrollTo(0,0);
 };
@@ -1896,7 +1918,7 @@ const submitArchiveChildren = async () => {
                             setIsSuperAdminControl(false);
                             setUsername(''); 
                             setPassword('');
-                            setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
+                            setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], prestasi: [] });
                             
                             // Kembalikan ke beranda (login) dan tutup modal
                             setTab('home'); 
@@ -2399,6 +2421,100 @@ const submitArchiveChildren = async () => {
                 if (searchQuery) result = result.filter(c => (getVal(c, 'NAMA ANAK') || '').toLowerCase().includes(searchQuery.toLowerCase()));
                 return result;
             }, [data.anak, familyLookupMap, searchQuery, filterProgram, filterWilayah, filterKategoriAnak, filterKelas, filterJenjang, filterOta, role, allowedRegions]);
+
+            // 🏆 [BARU] DAFTAR PRESTASI ANAK — join sheet Prestasi_Anak dengan Anak (+ wilayah keluarga),
+            // dibatasi wilayah untuk role korwil sama seperti filteredAnak, dan bisa difilter dari UI.
+            const prestasiList = useMemo(() => {
+                const anakLookup = {};
+                data.anak.forEach(a => { anakLookup[norm(getVal(a, 'ID_Anak'))] = a; });
+
+                let result = (data.prestasi || [])
+                    .map(p => {
+                        const anak = anakLookup[norm(getVal(p, 'ID_Anak'))] || null;
+                        const parent = anak ? familyLookupMap[norm(getVal(anak, 'ID_Keluarga'))] : null;
+                        return {
+                            ...p,
+                            _namaAnak: anak ? getVal(anak, 'NAMA ANAK') : '(Anak Tidak Ditemukan)',
+                            _fotoAnak: anak ? getVal(anak, 'FOTO ANAK') : '',
+                            _wilayah: parent ? (getVal(parent, 'WILAYAH') || '').toUpperCase() : ''
+                        };
+                    });
+
+                if (role === 'korwil') {
+                    result = result.filter(p => allowedRegions.includes(p._wilayah));
+                } else if (filterWilayah) {
+                    result = result.filter(p => p._wilayah === filterWilayah.toUpperCase());
+                }
+
+                if (filterKategoriPrestasi) result = result.filter(p => (getVal(p, 'KATEGORI') || '').toUpperCase() === filterKategoriPrestasi.toUpperCase());
+                if (filterTingkatPrestasi) result = result.filter(p => (getVal(p, 'TINGKAT') || '').toUpperCase() === filterTingkatPrestasi.toUpperCase());
+
+                if (searchQuery) {
+                    const q = searchQuery.toLowerCase();
+                    result = result.filter(p =>
+                        (p._namaAnak || '').toLowerCase().includes(q) ||
+                        (getVal(p, 'PRESTASI') || '').toLowerCase().includes(q) ||
+                        (getVal(p, 'BIDANG') || '').toLowerCase().includes(q)
+                    );
+                }
+
+                // Terbaru dulu berdasarkan Tahun
+                return result.sort((a, b) => (getVal(b, 'TAHUN') || 0) - (getVal(a, 'TAHUN') || 0));
+            }, [data.prestasi, data.anak, familyLookupMap, filterWilayah, filterKategoriPrestasi, filterTingkatPrestasi, searchQuery, role, allowedRegions]);
+
+            // Buka modal tambah prestasi untuk anak tertentu (dipilih dari kartu Data Anak)
+            const openAddPrestasi = (anak) => {
+                setPrestasiModal({ open: true, mode: 'add', anakId: getVal(anak, 'ID_Anak'), anakNama: getVal(anak, 'NAMA ANAK'), data: {} });
+            };
+            const openEditPrestasi = (item) => {
+                setPrestasiModal({ open: true, mode: 'edit', anakId: getVal(item, 'ID_Anak'), anakNama: item._namaAnak, data: { ...item } });
+            };
+
+            const handleSavePrestasi = async () => {
+                const form = prestasiModal.data;
+                if (!form['PRESTASI'] || !(form['PRESTASI'] || '').toString().trim()) {
+                    setMsg("⚠️ Nama/deskripsi prestasi wajib diisi."); setTimeout(() => setMsg(""), 3000); return;
+                }
+                setSavingPrestasi(true);
+                try {
+                    const token = yassaStore.get('yassa-token') || '';
+                    const isEdit = prestasiModal.mode === 'edit';
+                    const payloadData = { ...form, 'ID_Anak': prestasiModal.anakId };
+                    let idPrestasi = form['ID_Prestasi'];
+                    if (!isEdit) {
+                        idPrestasi = `PRS-${prestasiModal.anakId}-${Date.now()}`;
+                        payloadData['ID_Prestasi'] = idPrestasi;
+                    }
+                    const res = await postApi({
+                        action: isEdit ? 'update' : 'create',
+                        sheet: 'Prestasi_Anak',
+                        id: idPrestasi,
+                        data: payloadData,
+                        token
+                    });
+                    if (!res.success) throw new Error(res.error || 'Gagal menyimpan.');
+                    setMsg("✅ Data prestasi berhasil disimpan!");
+                    setTimeout(() => setMsg(""), 3000);
+                    setPrestasiModal({ open: false, mode: 'add', anakId: '', anakNama: '', data: {} });
+                    refresh();
+                } catch (e) {
+                    setMsg("❌ Gagal simpan: " + e.message); setTimeout(() => setMsg(""), 4000);
+                }
+                setSavingPrestasi(false);
+            };
+
+            const handleDeletePrestasi = async (item) => {
+                if (!window.confirm(`Hapus data prestasi "${getVal(item, 'PRESTASI')}" milik ${item._namaAnak}?`)) return;
+                try {
+                    const token = yassaStore.get('yassa-token') || '';
+                    const res = await postApi({ action: 'delete', sheet: 'Prestasi_Anak', id: getVal(item, 'ID_Prestasi'), token });
+                    if (!res.success) throw new Error(res.error || 'Gagal menghapus.');
+                    setMsg("✅ Data prestasi berhasil dihapus!"); setTimeout(() => setMsg(""), 3000);
+                    refresh();
+                } catch (e) {
+                    setMsg("❌ Gagal hapus: " + e.message); setTimeout(() => setMsg(""), 4000);
+                }
+            };
 
             const openEditFamily = (f) => {
                 // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
@@ -4719,6 +4835,25 @@ const submitArchiveChildren = async () => {
 
                         {tab === 'anak' && (role === 'admin' || role === 'korwil' || role === 'pengurus') && (
                             <div className="space-y-4 fade-in print-container">
+
+                                {/* 🏆 [BARU] TOGGLE SUB-TAB: SEMUA ANAK vs ANAK BERPRESTASI */}
+                                <div className="no-print flex gap-2 bg-[#E0E5EC] p-1.5 rounded-2xl shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                    <button
+                                        onClick={() => setSubTabAnak('semua')}
+                                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTabAnak === 'semua' ? 'bg-[#E0E5EC] text-sky-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400'}`}
+                                    >
+                                        Semua Anak
+                                    </button>
+                                    <button
+                                        onClick={() => setSubTabAnak('prestasi')}
+                                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${subTabAnak === 'prestasi' ? 'bg-[#E0E5EC] text-amber-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400'}`}
+                                    >
+                                        🏆 Anak Berprestasi
+                                        {prestasiList.length > 0 && <span className="bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 text-[8px]">{prestasiList.length}</span>}
+                                    </button>
+                                </div>
+
+                                <div className={subTabAnak === 'semua' ? 'space-y-4' : 'hidden'}>
                                 
                                 {/* BAGIAN KHUSUS PRINT KATALOG ANAK (TERSEMBUNYI SAAT MODE LAYAR) */}
                                 <div className="print-only mb-6">
@@ -5041,6 +5176,9 @@ const submitArchiveChildren = async () => {
                                                     ) : (
                                                         <button onClick={() => { setRegChildren([item]); setRegModal({ open: true, step: 2, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-blue-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="eye" size={16} /></button>
                                                     )}
+                                                    {role === 'admin' && (
+                                                        <button onClick={() => openAddPrestasi(item)} title="Tambah Prestasi" className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-amber-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="award" size={16} /></button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -5059,8 +5197,213 @@ const submitArchiveChildren = async () => {
 
                                     {filteredKeluarga.length === 0 && <div className="text-center py-10 text-slate-300 font-bold text-xs uppercase no-print">Data Tidak Ditemukan</div>}
                                 </div>
+                                </div>
+                                {/* akhir wrapper subTabAnak === 'semua' */}
+
+                                {/* 🏆 [BARU] SUB-TAB: DAFTAR ANAK BERPRESTASI */}
+                                {subTabAnak === 'prestasi' && (
+                                    <div className="space-y-4">
+
+                                        {/* VERSI CETAK PDF (window.print) */}
+                                        <div className="print-only mb-6">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="w-20 ml-6"><YassaLogo size={70} mode="mini" /></div>
+                                                <div className="flex-1 text-center px-4">
+                                                    <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900 mb-1" style={{fontFamily: "'Arial Black', Impact, sans-serif"}}>YAYASAN SALAM Satu ASPAL</h1>
+                                                    <p className="text-[8px] text-slate-700">Akte Notaris Nomor 5 Tgl 02 Agustus 2022 Notaris Jose Dima Satria.SH.M.KN., SK.MENKUMHAM Nomor AHU-0024199.AH.01.12.Tahun 2022 NPWP No.61.030.342.2-416.000</p>
+                                                </div>
+                                                <div className="w-20 flex justify-end"></div>
+                                            </div>
+                                            <div className="border-t-[1.5px] border-slate-900 mb-[2px]"></div>
+                                            <div className="border-t-[3px] border-slate-900 mb-6"></div>
+                                            <div className="text-center mb-6">
+                                                <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Daftar Anak Berprestasi</h2>
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
+                                                    Wilayah: {filterWilayah || 'SEMUA'} • Kategori: {filterKategoriPrestasi || 'SEMUA'} • Tingkat: {filterTingkatPrestasi || 'SEMUA'}
+                                                    <br/> Total: {prestasiList.length} Prestasi
+                                                </p>
+                                            </div>
+                                            <table className="w-full text-[8pt] border-collapse">
+                                                <thead>
+                                                    <tr className="border-b-2 border-slate-800 text-left">
+                                                        <th className="py-2 pr-2">No</th>
+                                                        <th className="py-2 pr-2">Nama Anak</th>
+                                                        <th className="py-2 pr-2">Kategori</th>
+                                                        <th className="py-2 pr-2">Bidang</th>
+                                                        <th className="py-2 pr-2">Prestasi</th>
+                                                        <th className="py-2 pr-2">Tingkat</th>
+                                                        <th className="py-2 pr-2">Tahun</th>
+                                                        <th className="py-2 pr-2">Wilayah</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {prestasiList.map((item, i) => (
+                                                        <tr key={i} className="border-b border-slate-200 break-inside-avoid">
+                                                            <td className="py-1.5 pr-2">{i + 1}</td>
+                                                            <td className="py-1.5 pr-2 font-bold uppercase">{item._namaAnak}</td>
+                                                            <td className="py-1.5 pr-2">{getVal(item, 'KATEGORI')}</td>
+                                                            <td className="py-1.5 pr-2">{getVal(item, 'BIDANG')}</td>
+                                                            <td className="py-1.5 pr-2">{getVal(item, 'PRESTASI')}</td>
+                                                            <td className="py-1.5 pr-2">{getVal(item, 'TINGKAT')}</td>
+                                                            <td className="py-1.5 pr-2">{getVal(item, 'TAHUN')}</td>
+                                                            <td className="py-1.5 pr-2 uppercase">{item._wilayah}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* VERSI LAYAR (HP/WEB) */}
+                                        <div className="no-print space-y-4">
+                                            <div className="flex flex-wrap gap-2.5 items-center justify-between bg-[#E0E5EC] p-4 rounded-2xl shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)]">
+                                                <select
+                                                    className="bg-[#E0E5EC] border-none px-4 py-3 flex-1 min-w-[110px] rounded-2xl text-[10px] font-black outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-purple-600 cursor-pointer"
+                                                    value={filterKategoriPrestasi}
+                                                    onChange={e => setFilterKategoriPrestasi(e.target.value)}
+                                                >
+                                                    <option value="">Semua Kategori</option>
+                                                    {PRESTASI_FIELDS.find(f => f.key === 'KATEGORI').options.map(o => <option key={o} value={o}>{o}</option>)}
+                                                </select>
+                                                <select
+                                                    className="bg-[#E0E5EC] border-none px-4 py-3 flex-1 min-w-[110px] rounded-2xl text-[10px] font-black outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-amber-600 cursor-pointer"
+                                                    value={filterTingkatPrestasi}
+                                                    onChange={e => setFilterTingkatPrestasi(e.target.value)}
+                                                >
+                                                    <option value="">Semua Tingkat</option>
+                                                    {PRESTASI_FIELDS.find(f => f.key === 'TINGKAT').options.map(o => <option key={o} value={o}>{o}</option>)}
+                                                </select>
+                                                <button
+                                                    onClick={() => window.print()}
+                                                    className="p-3.5 px-6 rounded-2xl bg-[#E0E5EC] border-none text-emerald-600 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] outline-none"
+                                                >
+                                                    <Icon name="printer" size={16} /> Cetak PDF
+                                                </button>
+                                            </div>
+
+                                            {role === 'admin' && (
+                                                <button
+                                                    onClick={() => setPrestasiModal({ open: true, mode: 'add', anakId: '', anakNama: '', data: {} })}
+                                                    className="w-full p-3.5 rounded-2xl bg-[#E0E5EC] border-none text-amber-600 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] outline-none"
+                                                >
+                                                    <Icon name="plus-circle" size={16} /> Tambah Prestasi
+                                                </button>
+                                            )}
+
+                                            {prestasiList.length === 0 && (
+                                                <div className="text-center py-14 text-slate-300 font-bold text-xs uppercase">Belum Ada Data Prestasi</div>
+                                            )}
+
+                                            {prestasiList.map((item, i) => (
+                                                <div key={i} className="bg-[#E0E5EC] rounded-2xl p-4 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] flex gap-3">
+                                                    <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-[inset_2px_2px_4px_rgb(163,177,198,0.5),inset_-2px_-2px_4px_rgba(255,255,255,0.8)]">
+                                                        {getVal(item, 'FOTO_PIAGAM') || item._fotoAnak ? (
+                                                            <img src={getVal(item, 'FOTO_PIAGAM') || item._fotoAnak} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-amber-400"><Icon name="award" size={22} /></div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-black text-[11px] uppercase text-slate-800 truncate">{item._namaAnak}</p>
+                                                        <p className="text-[11px] font-bold text-slate-700 mt-0.5">{getVal(item, 'PRESTASI')}</p>
+                                                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                            {getVal(item, 'KATEGORI') && <span className="text-[8px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-lg font-black uppercase">{getVal(item, 'KATEGORI')}</span>}
+                                                            {getVal(item, 'BIDANG') && <span className="text-[8px] bg-sky-100 text-sky-700 px-2 py-0.5 rounded-lg font-black uppercase">{getVal(item, 'BIDANG')}</span>}
+                                                            {getVal(item, 'TINGKAT') && <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-black uppercase">{getVal(item, 'TINGKAT')}</span>}
+                                                            {getVal(item, 'TAHUN') && <span className="text-[8px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-lg font-black">{getVal(item, 'TAHUN')}</span>}
+                                                        </div>
+                                                    </div>
+                                                    {role === 'admin' && (
+                                                        <div className="flex flex-col gap-1.5 shrink-0">
+                                                            <button onClick={() => openEditPrestasi(item)} className="p-2.5 bg-[#E0E5EC] border-none rounded-xl text-slate-500 shadow-[3px_3px_6px_rgb(163,177,198,0.6),-3px_-3px_6px_rgba(255,255,255,0.8)] active:text-green-600 transition-all"><Icon name="edit" size={14} /></button>
+                                                            <button onClick={() => handleDeletePrestasi(item)} className="p-2.5 bg-[#E0E5EC] border-none rounded-xl text-slate-500 shadow-[3px_3px_6px_rgb(163,177,198,0.6),-3px_-3px_6px_rgba(255,255,255,0.8)] active:text-red-600 transition-all"><Icon name="trash-2" size={14} /></button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
+
+{prestasiModal.open && (
+    <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[300] p-4 flex items-center justify-center fade-in no-print" onClick={() => setPrestasiModal({ open: false, mode: 'add', anakId: '', anakNama: '', data: {} })}>
+        <div className="bg-white rounded-3xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-5">
+                <div className="p-2.5 bg-amber-50 text-amber-500 rounded-2xl"><Icon name="award" size={20} /></div>
+                <div>
+                    <h3 className="text-sm font-black uppercase text-slate-800 tracking-wide">{prestasiModal.mode === 'edit' ? 'Ubah Prestasi' : 'Tambah Prestasi'}</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">{prestasiModal.anakNama || 'Pilih anak terlebih dahulu'}</p>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                {/* Dropdown pilih anak — hanya tampil kalau belum ada anak terpilih (mode tambah dari sub-tab Berprestasi) */}
+                {!prestasiModal.anakId && (
+                    <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">Pilih Anak</label>
+                        <select
+                            value=""
+                            onChange={e => {
+                                const anak = data.anak.find(a => getVal(a, 'ID_Anak') === e.target.value);
+                                setPrestasiModal(prev => ({ ...prev, anakId: e.target.value, anakNama: anak ? getVal(anak, 'NAMA ANAK') : '' }));
+                            }}
+                            className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50 shadow-sm"
+                        >
+                            <option value="">-- Cari & Pilih Nama Anak --</option>
+                            {data.anak.slice().sort((a,b) => (getVal(a,'NAMA ANAK')||'').localeCompare(getVal(b,'NAMA ANAK')||'')).map((a, idx) => (
+                                <option key={idx} value={getVal(a, 'ID_Anak')}>{getVal(a, 'NAMA ANAK')}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {PRESTASI_FIELDS.map(f => (
+                    <div key={f.key}>
+                        <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">{f.label}</label>
+                        {f.type === 'select' ? (
+                            <select
+                                value={prestasiModal.data[f.key] || ''}
+                                onChange={e => setPrestasiModal(prev => ({ ...prev, data: { ...prev.data, [f.key]: e.target.value } }))}
+                                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50 shadow-sm"
+                            >
+                                <option value="">-- Pilih --</option>
+                                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                        ) : f.type === 'textarea' ? (
+                            <textarea
+                                value={prestasiModal.data[f.key] || ''}
+                                onChange={e => setPrestasiModal(prev => ({ ...prev, data: { ...prev.data, [f.key]: e.target.value } }))}
+                                rows={2}
+                                placeholder={f.placeholder || ''}
+                                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50 shadow-sm"
+                            />
+                        ) : (
+                            <input
+                                type={f.type}
+                                value={prestasiModal.data[f.key] || ''}
+                                onChange={e => setPrestasiModal(prev => ({ ...prev, data: { ...prev.data, [f.key]: e.target.value } }))}
+                                placeholder={f.placeholder || ''}
+                                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50 shadow-sm"
+                            />
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="flex gap-2.5 mt-6">
+                <button onClick={() => setPrestasiModal({ open: false, mode: 'add', anakId: '', anakNama: '', data: {} })} className="flex-1 py-3.5 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">Batal</button>
+                <button
+                    onClick={handleSavePrestasi}
+                    disabled={savingPrestasi || !prestasiModal.anakId}
+                    className="flex-1 py-3.5 rounded-2xl bg-amber-500 text-white font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                    {savingPrestasi ? 'Menyimpan...' : (<><Icon name="save" size={14} /> Simpan</>)}
+                </button>
+            </div>
+        </div>
+    </div>
+)}
 
 {tab === 'aksi' && (
                             <div className="space-y-5 fade-in no-print">
@@ -5329,7 +5672,7 @@ const submitArchiveChildren = async () => {
                                         setRole(''); setUserWilayah(''); setActiveUser(''); setUserFullName(''); setUserFotoUrl('');
                                         setIsSuperAdminControl(false);
                                         setUsername(''); setPassword('');
-                                        setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [] });
+                                        setData({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], prestasi: [] });
                                         setTab('home'); window.scrollTo(0,0);
                                     }}
                                     className="w-full bg-[#E0E5EC] border-none text-rose-600 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[3px] shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] hover:text-rose-700 active:scale-[0.98] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] outline-none transition-all duration-200 flex items-center justify-center gap-2.5"
