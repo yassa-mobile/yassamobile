@@ -410,6 +410,12 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             return foundKey ? String(obj[foundKey] || "") : "";
         };
 
+        // 🏆 [BARU] Satu sel FOTO_PIAGAM bisa menampung BEBERAPA link foto/PDF,
+        // dipisah karakter "|" (dipilih karena tidak pernah muncul di URL Drive).
+        const parseFotoList = (str) => (str || '').split('|').map(s => s.trim()).filter(Boolean);
+        const joinFotoList = (arr) => arr.filter(Boolean).join('|');
+        const isFotoPdf = (url) => (url || '').includes('/file/d/');
+
         // ============================================================
         // 🔒 FUNGSI INTI: SEMUA API CALL PAKAI POST (Token tidak di URL)
         // ============================================================
@@ -2471,25 +2477,35 @@ const submitArchiveChildren = async () => {
                 setPrestasiModal({ open: true, mode: 'edit', anakId: getVal(item, 'ID_Anak'), anakNama: item._namaAnak, data: { ...item } });
             };
 
-            // 🏆 Upload foto piagam/piala langsung dari kamera/galeri HP ke Google Drive
-            // (memakai action 'uploadImage' backend yang sama seperti upload Foto Anak)
+            // 🏆 Upload foto/PDF piagam-piala langsung dari kamera/galeri HP ke Google Drive.
+            // MENDUKUNG MULTI-FOTO: user bisa pilih beberapa file sekaligus dari galeri,
+            // atau upload satu-satu berkali-kali — semuanya di-APPEND (ditambahkan), bukan menimpa yang lama.
             const handleUploadFotoPrestasi = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+                const files = Array.from(e.target.files || []);
+                if (files.length === 0) return;
 
-                if (file.size > 5 * 1024 * 1024) {
-                    setMsg("⚠️ Ukuran foto terlalu besar! Maksimal 5MB.");
+                const tooBig = files.find(f => f.size > 5 * 1024 * 1024);
+                if (tooBig) {
+                    setMsg(`⚠️ Ada file terlalu besar (maks 5MB): ${tooBig.name}`);
                     setTimeout(() => setMsg(""), 4000);
+                    e.target.value = '';
                     return;
                 }
 
                 setUploadingFotoPrestasi(true);
+                let successCount = 0;
+                let failCount = 0;
 
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onloadend = async () => {
+                // Upload satu per satu (bukan paralel) supaya tidak membebani koneksi HP di lapangan
+                for (const file of files) {
                     try {
-                        const base64Image = reader.result.split(',')[1];
+                        const base64Image = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+
                         const payload = {
                             action: 'uploadPrestasiFile',
                             base64: base64Image,
@@ -2503,17 +2519,25 @@ const submitArchiveChildren = async () => {
                         }).then(r => r.json());
 
                         if (res.success) {
-                            setPrestasiModal(prev => ({ ...prev, data: { ...prev.data, 'FOTO_PIAGAM': res.url } }));
-                            setMsg("✅ Foto berhasil disimpan ke Google Drive!");
+                            successCount++;
+                            setPrestasiModal(prev => {
+                                const existing = parseFotoList(prev.data['FOTO_PIAGAM']);
+                                return { ...prev, data: { ...prev.data, 'FOTO_PIAGAM': joinFotoList([...existing, res.url]) } };
+                            });
                         } else {
-                            setMsg(`❌ Gagal Simpan di Drive: ${res.error || 'Server Error'}`);
+                            failCount++;
                         }
                     } catch (err) {
-                        setMsg("❌ Error jaringan saat upload foto.");
+                        failCount++;
                     }
-                    setUploadingFotoPrestasi(false);
-                    setTimeout(() => setMsg(""), 5000);
-                };
+                }
+
+                if (successCount > 0) setMsg(`✅ ${successCount} foto berhasil disimpan ke Google Drive!${failCount > 0 ? ` (${failCount} gagal)` : ''}`);
+                else setMsg("❌ Gagal menyimpan foto. Cek koneksi internet.");
+
+                e.target.value = ''; // reset input supaya bisa pilih file yang sama lagi kalau perlu
+                setUploadingFotoPrestasi(false);
+                setTimeout(() => setMsg(""), 5000);
             };
 
             const handleSavePrestasi = async () => {
@@ -5352,18 +5376,24 @@ const submitArchiveChildren = async () => {
                                                 <div className="text-center py-14 text-slate-300 font-bold text-xs uppercase">Belum Ada Data Prestasi</div>
                                             )}
 
-                                            {prestasiList.map((item, i) => (
+                                            {prestasiList.map((item, i) => {
+                                                const fotoListItem = parseFotoList(getVal(item, 'FOTO_PIAGAM'));
+                                                const fotoUtama = fotoListItem[0] || item._fotoAnak;
+                                                return (
                                                 <div key={i} className="bg-[#E0E5EC] rounded-2xl p-4 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] flex gap-3">
-                                                    <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-[inset_2px_2px_4px_rgb(163,177,198,0.5),inset_-2px_-2px_4px_rgba(255,255,255,0.8)]">
-                                                        {(getVal(item, 'FOTO_PIAGAM') || '').includes('/file/d/') ? (
-                                                            <a href={getVal(item, 'FOTO_PIAGAM')} target="_blank" rel="noreferrer" className="w-full h-full flex flex-col items-center justify-center text-red-500 gap-0.5">
+                                                    <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 shadow-[inset_2px_2px_4px_rgb(163,177,198,0.5),inset_-2px_-2px_4px_rgba(255,255,255,0.8)]">
+                                                        {fotoUtama && isFotoPdf(fotoUtama) ? (
+                                                            <a href={fotoUtama} target="_blank" rel="noreferrer" className="w-full h-full flex flex-col items-center justify-center text-red-500 gap-0.5">
                                                                 <Icon name="book-open" size={18} />
                                                                 <span className="text-[6px] font-black uppercase">PDF</span>
                                                             </a>
-                                                        ) : (getVal(item, 'FOTO_PIAGAM') || item._fotoAnak) ? (
-                                                            <img src={getVal(item, 'FOTO_PIAGAM') || item._fotoAnak} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                                                        ) : fotoUtama ? (
+                                                            <img src={fotoUtama} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-amber-400"><Icon name="award" size={22} /></div>
+                                                        )}
+                                                        {fotoListItem.length > 1 && (
+                                                            <div className="absolute bottom-0 right-0 bg-slate-900/80 text-white text-[7px] font-black px-1.5 py-0.5 rounded-tl-lg">+{fotoListItem.length - 1}</div>
                                                         )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -5383,7 +5413,8 @@ const submitArchiveChildren = async () => {
                                                         </div>
                                                     )}
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -5472,32 +5503,46 @@ const submitArchiveChildren = async () => {
                     );
                 })}
 
-                {/* 📸 Upload Foto Piagam/Piala langsung dari kamera/galeri HP */}
+                {/* 📸 Upload Foto/PDF Piagam-Piala — MENDUKUNG LEBIH DARI 1 FOTO */}
                 <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">Foto / Scan Piagam / Piala</label>
-                    <div className="flex items-center gap-3">
-                        <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
-                            {prestasiModal.data['FOTO_PIAGAM'] ? (
-                                (prestasiModal.data['FOTO_PIAGAM'] || '').includes('/file/d/') ? (
-                                    <a href={prestasiModal.data['FOTO_PIAGAM']} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center text-red-500 gap-0.5">
-                                        <Icon name="book-open" size={20} />
-                                        <span className="text-[7px] font-black uppercase">PDF</span>
-                                    </a>
-                                ) : (
-                                    <img src={prestasiModal.data['FOTO_PIAGAM']} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                                )
-                            ) : (
-                                <Icon name="award" size={22} className="text-slate-300" />
-                            )}
+                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">
+                        Foto / Scan Piagam / Piala {parseFotoList(prestasiModal.data['FOTO_PIAGAM']).length > 0 && `(${parseFotoList(prestasiModal.data['FOTO_PIAGAM']).length})`}
+                    </label>
+
+                    {parseFotoList(prestasiModal.data['FOTO_PIAGAM']).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2.5">
+                            {parseFotoList(prestasiModal.data['FOTO_PIAGAM']).map((url, fi) => (
+                                <div key={fi} className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                                    {isFotoPdf(url) ? (
+                                        <a href={url} target="_blank" rel="noreferrer" className="w-full h-full flex flex-col items-center justify-center text-red-500 gap-0.5">
+                                            <Icon name="book-open" size={18} />
+                                            <span className="text-[6px] font-black uppercase">PDF</span>
+                                        </a>
+                                    ) : (
+                                        <img src={url} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const remaining = parseFotoList(prestasiModal.data['FOTO_PIAGAM']).filter((_, idx) => idx !== fi);
+                                            setPrestasiModal(prev => ({ ...prev, data: { ...prev.data, 'FOTO_PIAGAM': joinFotoList(remaining) } }));
+                                        }}
+                                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md"
+                                    >
+                                        <Icon name="x" size={11} />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
-                        <label className="flex-1">
-                            <input type="file" accept="image/*,application/pdf" onChange={handleUploadFotoPrestasi} className="hidden" disabled={uploadingFotoPrestasi} />
-                            <div className="w-full text-center py-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-[10px] font-black uppercase tracking-widest cursor-pointer active:scale-[0.98] transition-all">
-                                {uploadingFotoPrestasi ? 'Mengunggah...' : (prestasiModal.data['FOTO_PIAGAM'] ? '📸 Ganti File' : '📸 Ambil Foto / Pilih File')}
-                            </div>
-                        </label>
-                    </div>
-                    <p className="text-[8px] text-slate-400 font-bold mt-1.5 ml-1">Bisa foto (kamera/galeri) atau file PDF hasil scan. Maks 5MB.</p>
+                    )}
+
+                    <label className="block">
+                        <input type="file" accept="image/*,application/pdf" multiple onChange={handleUploadFotoPrestasi} className="hidden" disabled={uploadingFotoPrestasi} />
+                        <div className="w-full text-center py-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-[10px] font-black uppercase tracking-widest cursor-pointer active:scale-[0.98] transition-all">
+                            {uploadingFotoPrestasi ? 'Mengunggah...' : '📸 Tambah Foto / File (Bisa Pilih Banyak)'}
+                        </div>
+                    </label>
+                    <p className="text-[8px] text-slate-400 font-bold mt-1.5 ml-1">Bisa foto (kamera/galeri, pilih banyak sekaligus) atau file PDF hasil scan. Maks 5MB per file.</p>
                 </div>
             </div>
 
