@@ -6,7 +6,7 @@
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "3.0.1";
+const SW_VERSION = "3.0.3";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
@@ -62,7 +62,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_NAME = 'yassa-cache-v4';
+const CACHE_NAME = 'yassa-cache-v5';
 
 const STATIC_ASSETS = [
   '/yassamobile/',
