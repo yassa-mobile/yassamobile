@@ -696,23 +696,33 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
 
             // --- MULAI KODE BARU: INISIALISASI LOGIN GOOGLE ---
             React.useEffect(() => {
-                // Pastikan library Google sudah siap di browser dan user belum login
-                if (window.google && window.google.accounts && !role) {
-                    window.google.accounts.id.initialize({
-                        // Client ID asli YASSA Mobile milik Mas Heru
-                        client_id: "486322853600-dhjnc8i3rnc8562fh3qe3qq8eu0gkcnt.apps.googleusercontent.com",
-                        callback: handleGoogleResponse
-                    });
-                    
-                    // Mencari elemen wadah di HTML dan merender tombol Google di dalamnya
-                    const googleButtonDiv = document.getElementById("google-login-button");
-                    if (googleButtonDiv) {
-                        window.google.accounts.id.renderButton(
-                            googleButtonDiv,
-                            { theme: "outline", size: "large", width: "100%", shape: "pill" } 
-                        );
+                if (role) return; // Jika sudah login, hentikan proses
+
+                const muatTombolGoogle = () => {
+                    // Cek apakah library Google sudah siap di browser
+                    if (window.google && window.google.accounts) {
+                        window.google.accounts.id.initialize({
+                            // Client ID asli YASSA Mobile milik Mas Heru
+                            client_id: "486322853600-dhjnc8i3rnc8562fh3qe3qq8eu0gkcnt.apps.googleusercontent.com",
+                            callback: handleGoogleResponse
+                        });
+                        
+                        // Cari wadah HTML dan tempelkan tombolnya
+                        const googleButtonDiv = document.getElementById("google-login-button");
+                        if (googleButtonDiv) {
+                            window.google.accounts.id.renderButton(
+                                googleButtonDiv,
+                                { theme: "outline", size: "large", width: "100%", shape: "pill" } 
+                            );
+                        }
+                    } else {
+                        // Jika Google belum datang, tunggu 100 milidetik lalu coba lagi
+                        setTimeout(muatTombolGoogle, 100);
                     }
-                }
+                };
+
+                // Jalankan fungsi penunggu
+                muatTombolGoogle();
             }, [role]); // Efek ini diulang jika status role (login) berubah
 
             // Fungsi sementara untuk menangkap balasan dari Google jika diklik
