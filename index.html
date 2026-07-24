@@ -1904,6 +1904,13 @@ const submitArchiveChildren = async () => {
                 
                 const performLogout = () => {
     sendLog(activeUser || 'Sistem', role, userWilayah, "Auto-Logout (Tidak ada aktivitas 60 Menit)");
+    
+    // --- MULAI KODE BARU: MEMBERITAHU GOOGLE BAHWA USER SUDAH LOGOUT ---
+    if (window.google && window.google.accounts) {
+        window.google.accounts.id.disableAutoSelect();
+    }
+    // --- AKHIR KODE BARU ---
+
     yassaStore.remove('yassa-role');
     yassaStore.remove('yassa-wilayah');
     yassaStore.remove('yassa-username');
