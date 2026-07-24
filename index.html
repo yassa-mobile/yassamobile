@@ -5962,6 +5962,12 @@ const submitArchiveChildren = async () => {
                                 <button
                                     onClick={() => {
                                         sendLog(activeUser || 'Sistem', role, userWilayah, 'Logout Aplikasi');
+
+                                        // Beritahu Google agar tidak auto-select akun lagi
+                                        if (window.google && window.google.accounts) {
+                                            window.google.accounts.id.disableAutoSelect();
+                                        }
+
                                         yassaStore.clear();
                                         setRole(''); setUserWilayah(''); setActiveUser(''); setUserFullName(''); setUserFotoUrl('');
                                         setIsSuperAdminControl(false);
