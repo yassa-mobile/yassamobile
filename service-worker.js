@@ -1,6 +1,6 @@
 // ============================================================
 // SERVICE WORKER - YASSA Mobile PWA
-// Versi: 3.0.3 (Auto-Update)
+// Versi: 3.0.4 (Auto-Update)
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
@@ -62,7 +62,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_NAME = 'yassa-cache-v5';
+const CACHE_NAME = 'yassa-cache-v6';
 
 const STATIC_ASSETS = [
   '/yassamobile/',
