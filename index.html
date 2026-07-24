@@ -728,14 +728,83 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 muatTombolGoogle();
             }, [role]); // Efek ini diulang jika status role (login) berubah
 
-            // Fungsi sementara untuk menangkap balasan dari Google jika diklik
-            const handleGoogleResponse = (response) => {
-                setLoading("MEMVERIFIKASI GOOGLE...");
-                console.log("Token dari Google: ", response.credential);
+            // Fungsi utama untuk menangkap balasan Google dan mengirimnya ke backend
+            const handleGoogleResponse = async (response) => {
+                setLoading("MEMVERIFIKASI AKUN GOOGLE...");
+                setLoginError('');
                 
-                // Nanti token ini yang dikirim ke Google Apps Script. 
-                // Sementara, tampilkan pesan sukses agar Mas Heru tahu tombolnya hidup.
-                alert("Berhasil! Google mengirimkan kunci masuk. Siap dihubungkan ke database.");
+                try {
+                    // Mengirim kunci (token) dari Google ke Google Apps Script
+                    let loginRes = await postApi({
+                        action: 'loginGoogle',
+                        credential: response.credential
+                    });
+                    
+                    let isValid = false;
+                    let assignedRole = '';
+                    let assignedWilayah = '';
+                    let assignedFullName = '';
+                    let assignedFotoUrl = '';
+                    let assignedSuperAdminControl = false;
+                    let cleanUsername = ''; // Email dari Google yang dicocokkan
+
+                    if (loginRes && loginRes.success && loginRes.data) {
+                        isValid = true;
+                        assignedRole = loginRes.data.role;
+                        assignedWilayah = loginRes.data.wilayah;
+                        assignedFullName = loginRes.data.fullName;
+                        assignedFotoUrl = loginRes.data.linkFoto || '';
+                        assignedSuperAdminControl = !!loginRes.data.isSuperAdminControl;
+                        cleanUsername = loginRes.data.username || '';
+                        
+                        if (loginRes.data.token) {
+                            yassaStore.set('yassa-token', loginRes.data.token);
+                        }
+                    }
+
+                    if (isValid) {
+                        setRole(assignedRole);
+                        setUserWilayah(assignedWilayah); 
+                        setActiveUser(cleanUsername); 
+                        setUserFullName(assignedFullName);
+                        setIsSuperAdminControl(assignedSuperAdminControl);
+                        
+                        yassaStore.set('yassa-role', assignedRole); 
+                        yassaStore.set('yassa-wilayah', assignedWilayah);
+                        yassaStore.set('yassa-username', cleanUsername);
+                        yassaStore.set('yassa-fullname', assignedFullName);
+                        yassaStore.set('yassa-active-user', cleanUsername);
+                        yassaStore.set('yassa-super-admin-control', assignedSuperAdminControl ? 'true' : 'false');
+                        
+                        let finalFotoUrl = assignedFotoUrl ? assignedFotoUrl.toString().trim() : '';
+                        if (!finalFotoUrl || finalFotoUrl === '') {
+                            finalFotoUrl = 'https://drive.google.com/thumbnail?id=1Jyj8wXcg0lJZtoT-lwZxwBdexBIMEDAA';
+                        }
+
+                        setUserFotoUrl(finalFotoUrl);
+                        yassaStore.set('yassa-foto', finalFotoUrl);
+                        
+                        setTab('home');
+                        sendLog(cleanUsername, assignedRole, assignedWilayah, 'Berhasil Login via Google');
+
+                        try {
+                            if ('Notification' in window && 'serviceWorker' in navigator) {
+                                if (typeof initPushNotification === 'function') {
+                                    initPushNotification(cleanUsername);
+                                }
+                            }
+                        } catch (e) {
+                            console.log('FCM Error diabaikan:', e);
+                        }
+
+                    } else { 
+                        const errorMessage = (loginRes && loginRes.error) ? loginRes.error : 'Email Google tidak terdaftar di sistem!';
+                        setLoginError(errorMessage);
+                        sendLog('GoogleSignIn', 'Gagal', 'Unknown', 'Akses Ditolak');
+                    }
+                } catch (e) {
+                    setLoginError('Gagal memverifikasi akun Google. Cek koneksi internet.');
+                }
                 setLoading(false);
             };
             // --- AKHIR KODE BARU ---
