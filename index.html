@@ -1906,6 +1906,7 @@ const submitArchiveChildren = async () => {
     sendLog(activeUser || 'Sistem', role, userWilayah, "Auto-Logout (Tidak ada aktivitas 60 Menit)");
     
     // --- MULAI KODE BARU: MEMBERITAHU GOOGLE BAHWA USER SUDAH LOGOUT ---
+    // (Lihat catatan lengkap soal revoke() di tombol Logout manual)
     if (window.google && window.google.accounts) {
         window.google.accounts.id.disableAutoSelect();
         if (activeUser && activeUser.includes('@')) {
@@ -5974,6 +5975,16 @@ const submitArchiveChildren = async () => {
 
                                         // Beritahu Google agar tidak auto-select akun lagi & lepas consent-nya
                                         // supaya tombol kembali jadi "Login dengan Google" polos (bukan personalized)
+                                        //
+                                        // CATATAN (Keamanan Ekstra - Google Sign-In):
+                                        // Kita tidak bisa "melawan" tampilan paksa Google (kalau HP/browser masih
+                                        // login ke akun Google, akun itu akan tetap muncul di daftar pilihan akun
+                                        // saat klik "Login dengan Google" - itu level sesi Google di device, di luar
+                                        // kendali aplikasi manapun). Tapi revoke() di sini memaksa Google untuk
+                                        // MELUPAKAN SESI KHUSUS APLIKASI YASSA setiap kali Mas Heru menekan tombol
+                                        // Keluar (logout manual) ATAU kena auto-logout 60 menit tanpa aktivitas.
+                                        // Efeknya: tidak ada lagi auto-select/auto-login diam-diam ke akun Google
+                                        // terakhir - user harus pilih & consent ulang akunnya tiap sesi baru.
                                         if (window.google && window.google.accounts) {
                                             window.google.accounts.id.disableAutoSelect();
                                             if (activeUser && activeUser.includes('@')) {
