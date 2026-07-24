@@ -714,6 +714,9 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                                 googleButtonDiv,
                                 { theme: "outline", size: "large", width: "100%", shape: "pill" } 
                             );
+                        } else {
+                            // TAMBAHAN: Jika wadah belum ada (tertutup animasi loading), coba lagi 100ms kemudian
+                            setTimeout(muatTombolGoogle, 100);
                         }
                     } else {
                         // Jika Google belum datang, tunggu 100 milidetik lalu coba lagi
