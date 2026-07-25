@@ -1165,6 +1165,10 @@ const submitArchiveChildren = async () => {
             const [waReportFilterBatch, setWaReportFilterBatch] = useState('SEMUA');
             const [waReportFilterStatus, setWaReportFilterStatus] = useState('SEMUA');
 
+            // STATE BARU: UPLOAD DOKUMEN ARSIP DARI PUSAT KONTROL
+            const [uploadArsipModal, setUploadArsipModal] = useState({ open: false, famId: '', docType: '', file: null, base64: '' });
+            const [isUploadingArsip, setIsUploadingArsip] = useState(false);
+
             // ============================================================
             // 🛡️ STATE TAB PERISAI (SECURITY DASHBOARD)
             // ============================================================
@@ -3164,6 +3168,116 @@ const submitArchiveChildren = async () => {
                     )}
 
                     {/* ============================================================ */}
+                    {/* 🟢 MODAL UPLOAD DOKUMEN ARSIP DARI PUSAT KONTROL             */}
+                    {/* ============================================================ */}
+                    {uploadArsipModal.open && (
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[400] flex items-center justify-center p-4 fade-in no-print">
+                            <div className="bg-[#E0E5EC] w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="bg-emerald-600 p-5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-2.5 rounded-xl shrink-0">
+                                            <Icon name="database" size={22} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black text-white text-sm uppercase tracking-wider leading-tight">Upload Dokumen</h3>
+                                            <p className="text-emerald-200 text-[10px] font-bold mt-0.5 uppercase tracking-widest">Simpan langsung ke Google Drive</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setUploadArsipModal({ open: false, famId: '', docType: '', file: null, base64: '' })} className="bg-white/20 p-2 rounded-xl hover:bg-white/30 transition-all shrink-0">
+                                        <Icon name="x" size={16} className="text-white" />
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Pilih Keluarga (Almarhum)</label>
+                                        <select 
+                                            value={uploadArsipModal.famId}
+                                            onChange={e => setUploadArsipModal({...uploadArsipModal, famId: e.target.value})}
+                                            className="w-full bg-[#E0E5EC] border-none px-4 py-3 rounded-xl text-xs font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-slate-700"
+                                        >
+                                            <option value="">-- PILIH KELUARGA --</option>
+                                            {data.keluarga.map(f => (
+                                                <option key={getVal(f, 'ID_Keluarga')} value={getVal(f, 'ID_Keluarga')}>
+                                                    {getVal(f, 'NAMA ALM')} - {getVal(f, 'WILAYAH')}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Pilih Jenis Dokumen</label>
+                                        <select 
+                                            value={uploadArsipModal.docType}
+                                            onChange={e => setUploadArsipModal({...uploadArsipModal, docType: e.target.value})}
+                                            className="w-full bg-[#E0E5EC] border-none px-4 py-3 rounded-xl text-xs font-bold outline-none shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] text-slate-700"
+                                        >
+                                            <option value="Link_KK">Kartu Keluarga (KK)</option>
+                                            <option value="Link_Akte">Akte Kematian</option>
+                                            <option value="Link_KTP_Alm">KTP Almarhum</option>
+                                            <option value="Link_Ktp_Istri">KTP Istri</option>
+                                            <option value="Link_Buku_Tabungan">Buku Tabungan</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Pilih File (Foto / Gambar)</label>
+                                        <input 
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={e => {
+                                                const file = e.target.files[0];
+                                                if(file) {
+                                                    const reader = new FileReader();
+                                                    reader.readAsDataURL(file);
+                                                    reader.onloadend = () => {
+                                                        setUploadArsipModal({...uploadArsipModal, file: file.name, base64: reader.result.split(',')[1]});
+                                                    };
+                                                }
+                                            }}
+                                            className="w-full text-xs font-bold text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="p-5 border-t border-slate-200/50 bg-[#E0E5EC]">
+                                    <button 
+                                        onClick={() => {
+                                            if(!uploadArsipModal.famId || !uploadArsipModal.base64) {
+                                                setMsg('⚠️ Pilih keluarga dan masukkan file terlebih dahulu!');
+                                                setTimeout(() => setMsg(""), 3000);
+                                                return;
+                                            }
+                                            setIsUploadingArsip(true);
+                                            setMsg('⏳ Sedang mengunggah dokumen...');
+                                            
+                                            // Mengirim data ke GAS (Code.gs)
+                                            postApi({
+                                                action: 'uploadDokumenArsipBaru',
+                                                famId: uploadArsipModal.famId,
+                                                docType: uploadArsipModal.docType,
+                                                base64: uploadArsipModal.base64,
+                                                fileName: uploadArsipModal.file,
+                                                token: yassaStore.get('yassa-token') || ''
+                                            }).then(res => {
+                                                setIsUploadingArsip(false);
+                                                if(res.success) {
+                                                    setMsg('✅ Dokumen berhasil diunggah & disimpan!');
+                                                    setUploadArsipModal({ open: false, famId: '', docType: '', file: null, base64: '' });
+                                                    refresh(); // Refresh data arsip
+                                                } else {
+                                                    setMsg('❌ Gagal: ' + (res.error || 'Server error'));
+                                                }
+                                                setTimeout(() => setMsg(""), 4000);
+                                            });
+                                        }}
+                                        disabled={isUploadingArsip}
+                                        className={`w-full py-4 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${isUploadingArsip ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 active:scale-95'}`}
+                                    >
+                                        {isUploadingArsip ? 'Mengunggah...' : <><Icon name="database" size={16} /> Upload Sekarang</>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ============================================================ */}
                     {/* 🆕 POPUP ERROR MIDTRANS MERAH — ANTI GAGAL                   */}
                     {/* ============================================================ */}
                     {/* 🆕 MODAL RINCIAN KARTU DATA BARU / TLH KELUAR (BERANDA) */}
@@ -3958,6 +4072,23 @@ const submitArchiveChildren = async () => {
                                         <div className="flex-1">
                                             <p className="font-black text-slate-800 text-sm uppercase tracking-wide">Broadcast WA</p>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">Kirim pesan massal via Fonnte</p>
+                                        </div>
+                                        <Icon name="chevron-right" size={18} className="text-slate-400 shrink-0" />
+                                    </button>
+                                )}
+
+                                {/* 🟢 [BARU] TOMBOL BUKA MODAL UPLOAD DOKUMEN ARSIP */}
+                                {role === 'admin' && (
+                                    <button
+                                        onClick={() => setUploadArsipModal({ open: true, famId: '', docType: 'Link_KK', file: null, base64: '' })}
+                                        className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all p-6 flex items-center gap-5 text-left mt-5"
+                                    >
+                                        <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                                            <Icon name="database" size={24} className="text-emerald-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-black text-slate-800 text-sm uppercase tracking-wide">Upload Dokumen</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">Unggah KK, KTP, atau Akte Kematian</p>
                                         </div>
                                         <Icon name="chevron-right" size={18} className="text-slate-400 shrink-0" />
                                     </button>
