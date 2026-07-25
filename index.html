@@ -468,20 +468,23 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                     <div className="flex flex-wrap gap-2">
                         {dokumen.map(d => {
                             const link = getVal(arsip, d.key);
-                            if (!link) return null;
+                            if (!link) {
+                                // Tampilkan versi "Tidak Ada" (Abu-abu pudar, ada tanda X merah, dan tidak bisa diklik)
+                                return (
+                                    <div key={d.key} className="text-[9px] font-bold uppercase text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl flex items-center gap-1.5 cursor-not-allowed">
+                                        <Icon name="x" size={11} className="text-rose-400" /> {d.label}
+                                    </div>
+                                );
+                            }
+                            // Tampilkan versi "Ada" (Warna hijau mencolok dan bisa diklik)
                             return (
                                 <a key={d.key} href={link} target="_blank" rel="noopener noreferrer"
-                                   className="text-[9px] font-black uppercase text-slate-700 bg-slate-100 border border-slate-300 px-3 py-2 rounded-xl shadow-sm hover:bg-slate-200 transition-all flex items-center gap-1.5">
+                                   className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl shadow-sm hover:bg-emerald-100 transition-all flex items-center gap-1.5">
                                     <Icon name={d.icon} size={11} /> {d.label}
                                 </a>
                             );
                         })}
                     </div>
-                    {dokumen.every(d => !getVal(arsip, d.key)) && (
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-3">
-                            Belum ada link dokumen yang diisi.
-                        </p>
-                    )}
                 </div>
             );
         };
