@@ -1,12 +1,12 @@
 // ============================================================
 // SERVICE WORKER - YASSA Mobile PWA
-// Versi: 3.0.6 (Auto-Update)
+// Versi: 3.0.7 (Auto-Update)
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "3.0.6";
+const SW_VERSION = "3.0.7";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
