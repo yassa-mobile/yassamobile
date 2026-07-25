@@ -1653,6 +1653,49 @@ const submitArchiveChildren = async () => {
 
             const norm = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
 
+            // --- MULAI KODE BARU: MESIN PENILAI KELENGKAPAN DATA ---
+            const hitungKelengkapan = useCallback((item, type, arsipItem = null) => {
+                if (!item) return 0;
+                let kolomWajib = [];
+                let jumlahTerisi = 0;
+
+                if (type === 'KK') {
+                    // Daftar kolom yang dicek untuk Data Keluarga (Bisa kita tambah/kurangi nanti)
+                    kolomWajib = ['NAMA ALM', 'NIK ALM', 'NAMA IBU', 'NIK IBU', 'NO TELEPON', 'ALAMAT', 'NIK KK', 'REKENING', 'SURAT RESIGN GOJEK'];
+                    
+                    kolomWajib.forEach(kolom => {
+                        const nilai = getVal(item, kolom);
+                        // Cek apakah data tidak kosong dan bukan tanda strip (-)
+                        if (nilai && nilai.trim() !== '' && nilai.trim() !== '-' && nilai.trim() !== '0') {
+                            jumlahTerisi++;
+                        }
+                    });
+
+                    // Cek kelengkapan dokumen di tab Arsip (Jika ada link folder arsip, tambah poin)
+                    if (arsipItem) {
+                        kolomWajib.push('DOKUMEN_ARSIP'); 
+                        const linkArsip = getVal(arsipItem, 'Link_Arsip');
+                        if (linkArsip && linkArsip.trim() !== '') jumlahTerisi++;
+                    }
+
+                } else if (type === 'ANAK') {
+                    // Daftar kolom yang dicek untuk Data Anak
+                    kolomWajib = ['NAMA ANAK', 'NIK ANAK', 'TANGGAL LAHIR', 'KELAS', 'JENJANG SEKOLAH', 'NAMA SEKOLAH', 'FOTO ANAK'];
+                    
+                    kolomWajib.forEach(kolom => {
+                        const nilai = getVal(item, kolom);
+                        if (nilai && nilai.trim() !== '' && nilai.trim() !== '-' && nilai.trim() !== '0') {
+                            jumlahTerisi++;
+                        }
+                    });
+                }
+
+                if (kolomWajib.length === 0) return 0;
+                // Hitung persen: (Terisi / Total Wajib) x 100, lalu bulatkan
+                return Math.round((jumlahTerisi / kolomWajib.length) * 100);
+            }, []);
+            // --- AKHIR KODE BARU ---
+
             // ============================================================
             // 🆕 AUTO WARNA BUKU INDUK BERDASARKAN DATA "10 AMPLOP"
             // Kalau ALM terpilih di app "Pemilihan Kel Alm" (sheet
@@ -4264,6 +4307,22 @@ const submitArchiveChildren = async () => {
                                                         <p className={`text-[10px] print:text-[7px] print:mb-0 font-black uppercase tracking-widest mb-1 ${isSelected ? 'text-blue-800/60' : 'text-slate-400'}`}>ALM BPK / KELUARGA DARI</p>
                                                         <div className="flex flex-wrap items-center gap-2 mb-4 print:mb-0.5 pr-12 print:pr-0">
                                                             <p className="font-black text-slate-800 text-lg print:text-sm uppercase leading-tight">{getVal(item, 'NAMA ALM') || '-'}</p>
+                                                            
+                                                            {/* --- MULAI KODE BARU: BADGE PERSEN KELENGKAPAN KK --- */}
+                                                            {(() => {
+                                                                const persenKK = hitungKelengkapan(item, 'KK', arsipByKeluarga[famId]);
+                                                                let warnaBadge = 'bg-rose-100 text-rose-700 border-rose-200'; // Merah (< 50%)
+                                                                if (persenKK >= 80) warnaBadge = 'bg-emerald-100 text-emerald-700 border-emerald-200'; // Hijau (>= 80%)
+                                                                else if (persenKK >= 50) warnaBadge = 'bg-amber-100 text-amber-700 border-amber-200'; // Kuning (50 - 79%)
+                                                                
+                                                                return (
+                                                                    <span className={`text-[9px] print:text-[7px] font-black px-2 py-0.5 rounded-md border shadow-sm ${warnaBadge} no-print`}>
+                                                                        {persenKK}% LENGKAP
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                            {/* --- AKHIR KODE BARU --- */}
+
                                                             <div className="flex gap-1.5 mt-1 sm:mt-0">
                                                                 {hasGopayFam && <span className="text-[8px] print:text-[6px] print:px-1 print:py-0 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md border border-blue-100 font-black uppercase">GOPAY</span>}
                                                                 {hasSapaFam && <span className="text-[8px] print:text-[6px] print:px-1 print:py-0 bg-rose-50 text-rose-500 px-2 py-0.5 rounded-md border border-rose-100 font-black uppercase">SAPA</span>}
@@ -4299,7 +4358,24 @@ const submitArchiveChildren = async () => {
                                                                                 />
                                                                             )}
                                                                             <div className="flex-1 min-w-0">
-                                                                                <p className="font-black text-slate-800 text-xs print:text-[10px] uppercase pr-4 print:pr-1">{getVal(c, 'NAMA ANAK')}</p>
+                                                                                <div className="flex items-center gap-2 pr-4 print:pr-1">
+                                                                                    <p className="font-black text-slate-800 text-xs print:text-[10px] uppercase">{getVal(c, 'NAMA ANAK')}</p>
+                                                                                    
+                                                                                    {/* --- MULAI KODE BARU: BADGE PERSEN KELENGKAPAN ANAK --- */}
+                                                                                    {(() => {
+                                                                                        const persenAnak = hitungKelengkapan(c, 'ANAK');
+                                                                                        let warnaBadgeAnak = 'bg-rose-100 text-rose-700'; 
+                                                                                        if (persenAnak >= 80) warnaBadgeAnak = 'bg-emerald-100 text-emerald-700'; 
+                                                                                        else if (persenAnak >= 50) warnaBadgeAnak = 'bg-amber-100 text-amber-700'; 
+                                                                                        
+                                                                                        return (
+                                                                                            <span className={`text-[8px] print:text-[6px] font-black px-1.5 py-0.5 rounded ${warnaBadgeAnak} no-print`}>
+                                                                                                {persenAnak}%
+                                                                                            </span>
+                                                                                        );
+                                                                                    })()}
+                                                                                    {/* --- AKHIR KODE BARU --- */}
+                                                                                </div>
                                                                                 
                                                                                 <div className="flex flex-wrap gap-1.5 print:gap-1 mt-1.5 mb-1.5 print:mt-0 print:mb-0">
                                                                                     {isYt && <span className={`text-[8px] print:text-[7px] px-1.5 py-0.5 print:py-0.5 rounded border font-bold uppercase ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>Yatim</span>}
