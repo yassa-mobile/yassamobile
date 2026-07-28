@@ -7383,18 +7383,28 @@ return (
                                                 setErrorMsg(''); 
                                                 
                                                 // Sinkronisasi otomatis form anak berdasarkan Jumlah Anak
-                                                const keyJml = Object.keys(regFamily).find(k => k.toUpperCase().includes('JUMLAH ANAK') || k.toUpperCase() === 'JML ANAK');
-                                                const jmlAnak = keyJml ? parseInt(regFamily[keyJml], 10) || 0 : 0;
-                                                
-                                                let currentChildren = [...regChildren];
-                                                if (jmlAnak > currentChildren.length) {
-                                                    const selisih = jmlAnak - currentChildren.length;
-                                                    for(let i = 0; i < selisih; i++) currentChildren.push({});
-                                                } else if (jmlAnak < currentChildren.length && regModal.mode === 'add') {
-                                                    currentChildren = currentChildren.slice(0, jmlAnak);
+                                                // FIX: hanya berlaku di mode TAMBAH keluarga baru (belum ada data Anak asli).
+                                                // Sebelumnya ini juga jalan di mode EDIT -- akibatnya kalau field manual
+                                                // "JUMLAH ANAK" di data Keluarga belum diupdate (misal setelah 1 anak
+                                                // diarsipkan karena lulus sekolah, tapi angkanya masih sisa lama),
+                                                // form anak yang beneran ADA malah ditambahi form KOSONG supaya
+                                                // jumlahnya "pas" dengan angka manual yang sudah basi itu.
+                                                // Di mode edit, data Anak asli dari database harus jadi acuan, bukan
+                                                // angka JUMLAH ANAK yang diisi manual dan gampang tidak sinkron.
+                                                if (regModal.mode === 'add') {
+                                                    const keyJml = Object.keys(regFamily).find(k => k.toUpperCase().includes('JUMLAH ANAK') || k.toUpperCase() === 'JML ANAK');
+                                                    const jmlAnak = keyJml ? parseInt(regFamily[keyJml], 10) || 0 : 0;
+
+                                                    let currentChildren = [...regChildren];
+                                                    if (jmlAnak > currentChildren.length) {
+                                                        const selisih = jmlAnak - currentChildren.length;
+                                                        for(let i = 0; i < selisih; i++) currentChildren.push({});
+                                                    } else if (jmlAnak < currentChildren.length) {
+                                                        currentChildren = currentChildren.slice(0, jmlAnak);
+                                                    }
+                                                    // Update state anak agar jumlah form sesuai
+                                                    if (jmlAnak > 0) setRegChildren(currentChildren);
                                                 }
-                                                // Update state anak agar jumlah form sesuai
-                                                if (jmlAnak > 0) setRegChildren(currentChildren);
 
                                                 setRegModal({ ...regModal, step: 2 });
                                             }} 
