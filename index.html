@@ -1044,17 +1044,31 @@ const submitArchiveChildren = async () => {
         const tglKeluar = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
         // Proses arsip satu per satu untuk setiap anak yang diceklist
+        // FIX: cek res.success tiap panggilan -- server bisa balas HTTP 200 dengan
+        // { success:false, error:"..." } (misal lock sibuk / sistem terkunci / ID tidak ketemu),
+        // dan sebelumnya itu diabaikan sehingga notifikasi "berhasil" tetap muncul
+        // walau data sebenarnya GAGAL diarsipkan (row masih ada di sheet Anak).
+        const gagal = [];
         for (let cId of archiveModal.selectedChildren) {
-            await postApi({
+            const res = await postApi({
                 action: 'archiveChild',
                 childId: cId,
                 tanggalKeluar: tglKeluar,
                 alasan: finalReason,
                 token: tkn
             });
+            if (!res || !res.success) {
+                gagal.push({ id: cId, error: (res && res.error) || 'Tidak ada respons dari server' });
+            }
         }
 
-        setMsg("✅ Data berhasil diarsipkan!");
+        if (gagal.length > 0) {
+            // Sebagian/semua gagal -- tampilkan apa adanya, JANGAN klaim berhasil
+            const contohError = gagal[0].error;
+            setMsg(`❌ ${gagal.length} data GAGAL diarsipkan: ${contohError}`);
+        } else {
+            setMsg("✅ Data berhasil diarsipkan!");
+        }
         
         // Reset tampilan
         setArchiveModal({ open: false, selectedChildren: [], reason: 'BUNDA MENIKAH KEMBALI', manualReason: '' });
@@ -2835,6 +2849,7 @@ const submitArchiveChildren = async () => {
 
                     // 3. Simpan Data Anak
                     const almForChild = (familyData['NAMA ALM'] || 'X').trim().toUpperCase();
+                    const anakGagal = [];
                     
                     for (let i = 0; i < regChildren.length; i++) {
                         let childData = { ...regChildren[i] };
@@ -2857,9 +2872,24 @@ const submitArchiveChildren = async () => {
                             data: childData,
                             token: token
                         };
-                        await postApi(payloadAnak);
+                        const resAnak = await postApi(payloadAnak);
+                        // FIX: sebelumnya res tidak dicek -- server bisa balas { success:false, error:"..." }
+                        // (misal sistem terkunci/tutup buku) tapi tetap dianggap "berhasil disimpan"
+                        if (!resAnak || !resAnak.success) {
+                            anakGagal.push({
+                                nama: childData['NAMA ANAK'] || `Anak ke-${i + 1}`,
+                                error: (resAnak && resAnak.error) || 'Tidak ada respons dari server'
+                            });
+                        }
                     }
                     
+                    if (anakGagal.length > 0) {
+                        // Data Keluarga (dan mungkin sebagian Anak) sudah tersimpan -- refresh dulu
+                        // supaya admin lihat state terbaru sebelum mencoba ulang yang gagal.
+                        refresh();
+                        throw new Error(`Keluarga tersimpan, tapi ${anakGagal.length} data anak GAGAL disimpan (${anakGagal[0].nama}: ${anakGagal[0].error})`);
+                    }
+
                     setMsg("✅ Data berhasil disimpan!");
 
                     // Pencatatan ke Riwayat Aktivitas dihapus agar tidak double.
