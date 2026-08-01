@@ -437,6 +437,43 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             }
         };
 
+        // ============================================================
+        // 🆕 DETEKSI KONFLIK EDIT BERSAMAAN
+        // ============================================================
+        // Dipakai KHUSUS untuk action 'update'. Server akan menolak dengan
+        // error berformat "KONFLIK_EDIT::{...json...}" kalau ada kolom yang
+        // SAMA-SAMA diubah oleh user ini DAN oleh admin lain sejak form
+        // dibuka (lihat updateDataFn_ di backend). Fungsi ini menangkap
+        // kondisi itu, menampilkan detail konflik ke user, dan menawarkan
+        // pilihan TIMPA (kirim ulang dengan forceOverwrite:true) atau BATAL
+        // (supaya pemanggil bisa refresh() dan user isi ulang manual).
+        const postApiUpdate = async (params) => {
+            const res = await postApi(params);
+            if (res && res.success === false && typeof res.error === 'string' && res.error.startsWith('KONFLIK_EDIT::')) {
+                let detail;
+                try { detail = JSON.parse(res.error.substring('KONFLIK_EDIT::'.length)); } catch (e) { detail = null; }
+
+                if (!detail || !Array.isArray(detail.diubahOlehAdminLainSejakFormDibuka)) {
+                    return { success: false, error: "Terjadi konflik data dengan admin lain, silakan muat ulang halaman." };
+                }
+
+                const daftarKonflik = detail.diubahOlehAdminLainSejakFormDibuka
+                    .map(k => `• ${k.kolom}\n   Nilai saat form dibuka: "${k.nilaiAwal}"\n   Sudah diubah admin lain jadi: "${k.nilaiTerkiniSheet}"\n   Yang Anda tulis: "${k.nilaiAndaTulis}"`)
+                    .join('\n\n');
+
+                const pesan = `⚠️ KONFLIK DATA!\n\nData "${detail.namaInfo}" sudah diubah oleh admin lain sejak Anda membuka form ini:\n\n${daftarKonflik}\n\nKlik OK untuk TIMPA dengan data yang sedang Anda isi (perubahan admin lain di atas akan hilang).\nKlik Batal untuk membatalkan dan memuat ulang data terbaru.`;
+
+                const mauTimpa = window.confirm(pesan);
+                if (mauTimpa) {
+                    // Kirim ulang, kali ini paksa timpa
+                    return await postApi({ ...params, forceOverwrite: true });
+                } else {
+                    return { success: false, error: "Dibatalkan oleh user (konflik data).", isCancelledConflict: true };
+                }
+            }
+            return res;
+        };
+
         // KOMPONEN TOMBOL DOKUMEN ARSIP KELUARGA (Manajemen_Arsip)
         // Menampilkan tombol klik untuk tiap link dokumen + info lokasi fisik & kode berkas.
         // Data arsip di-input/edit manual langsung di Google Sheet "Manajemen_Arsip".
@@ -2665,7 +2702,7 @@ const submitArchiveChildren = async () => {
                 setPrestasiModal({ open: true, mode: 'add', anakId: getVal(anak, 'ID_Anak'), anakNama: getVal(anak, 'NAMA ANAK'), data: {} });
             };
             const openEditPrestasi = (item) => {
-                setPrestasiModal({ open: true, mode: 'edit', anakId: getVal(item, 'ID_Anak'), anakNama: item._namaAnak, data: { ...item } });
+                setPrestasiModal({ open: true, mode: 'edit', anakId: getVal(item, 'ID_Anak'), anakNama: item._namaAnak, data: { ...item, _original: { ...item } } });
             };
 
             // 🏆 Upload foto/PDF piagam-piala langsung dari kamera/galeri HP ke Google Drive.
@@ -2740,20 +2777,27 @@ const submitArchiveChildren = async () => {
                 try {
                     const token = yassaStore.get('yassa-token') || '';
                     const isEdit = prestasiModal.mode === 'edit';
+                    const originalSnapshot = form._original;
                     const payloadData = { ...form, 'ID_Anak': prestasiModal.anakId };
+                    delete payloadData._original;
                     let idPrestasi = form['ID_Prestasi'];
                     if (!isEdit) {
                         idPrestasi = `PRS-${prestasiModal.anakId}-${Date.now()}`;
                         payloadData['ID_Prestasi'] = idPrestasi;
                     }
-                    const res = await postApi({
+                    const apiCall = isEdit ? postApiUpdate : postApi;
+                    const res = await apiCall({
                         action: isEdit ? 'update' : 'create',
                         sheet: 'Prestasi_Anak',
                         id: idPrestasi,
                         data: payloadData,
+                        originalData: isEdit ? originalSnapshot : undefined,
                         token
                     });
-                    if (!res.success) throw new Error(res.error || 'Gagal menyimpan.');
+                    if (!res.success) {
+                        if (res.isCancelledConflict) { refresh(); }
+                        throw new Error(res.error || 'Gagal menyimpan.');
+                    }
                     setMsg("✅ Data prestasi berhasil disimpan!");
                     setTimeout(() => setMsg(""), 3000);
                     setPrestasiModal({ open: false, mode: 'add', anakId: '', anakNama: '', data: {} });
@@ -2784,9 +2828,13 @@ const submitArchiveChildren = async () => {
                     setRegModal({ open: true, step: 1, mode: 'view' }); setErrorMsg('');
                     return;
                 }
-                setRegFamily(f);
+                // 🆕 Simpan snapshot data ASLI saat form dibuka (untuk deteksi konflik
+                // kalau ternyata admin lain mengubah data yang sama sebelum disimpan).
+                // Disimpan sebagai key "_original" -- aman, server otomatis mengabaikan
+                // key ini karena bukan nama kolom sheet manapun.
+                setRegFamily({ ...f, _original: { ...f } });
                 const relatedChildren = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
-                setRegChildren(relatedChildren.length > 0 ? relatedChildren : []);
+                setRegChildren(relatedChildren.length > 0 ? relatedChildren.map(c => ({ ...c, _original: { ...c } })) : []);
                 setRegModal({ open: true, step: 1, mode: 'edit' }); setErrorMsg('');
             };
 
@@ -2797,8 +2845,9 @@ const submitArchiveChildren = async () => {
                     return;
                 }
                 const parent = familyLookupMap[norm(getVal(c, 'ID_Keluarga'))];
-                if (parent) setRegFamily(parent);
-                setRegChildren([c]); setRegModal({ open: true, step: 2, mode: 'edit' }); setErrorMsg('');
+                // 🆕 Snapshot untuk deteksi konflik (lihat catatan di openEditFamily)
+                if (parent) setRegFamily({ ...parent, _original: { ...parent } });
+                setRegChildren([{ ...c, _original: { ...c } }]); setRegModal({ open: true, step: 2, mode: 'edit' }); setErrorMsg('');
             };
 
             const togglePrintSelection = (id) => {
@@ -2830,6 +2879,8 @@ const submitArchiveChildren = async () => {
                     
                     // 1. Persiapkan ID Keluarga
                     let familyData = { ...regFamily };
+                    const familyOriginalSnapshot = familyData._original;
+                    delete familyData._original;
                     if (regModal.mode === 'add') {
                         const alm = (familyData['NAMA ALM'] || 'X').trim().toUpperCase();
                         const ibu = (familyData['NAMA IBU'] || 'X').trim().toUpperCase();
@@ -2837,22 +2888,30 @@ const submitArchiveChildren = async () => {
                     }
 
                     // 2. Simpan Data Keluarga
+                    const isUpdateKeluarga = regModal.mode !== 'add';
                     const payloadKeluarga = {
-                        action: regModal.mode === 'add' ? 'create' : 'update',
+                        action: isUpdateKeluarga ? 'update' : 'create',
                         sheet: 'Keluarga',
                         id: regModal.mode === 'edit' ? familyData['ID_Keluarga'] : undefined,
                         data: familyData,
+                        originalData: isUpdateKeluarga ? familyOriginalSnapshot : undefined,
                         token: token
                     };
-                    const resKeluarga = await postApi(payloadKeluarga);
-                    if (!resKeluarga.success) throw new Error(resKeluarga.error);
+                    const resKeluarga = await (isUpdateKeluarga ? postApiUpdate : postApi)(payloadKeluarga);
+                    if (!resKeluarga.success) {
+                        if (resKeluarga.isCancelledConflict) refresh();
+                        throw new Error(resKeluarga.error);
+                    }
 
                     // 3. Simpan Data Anak
                     const almForChild = (familyData['NAMA ALM'] || 'X').trim().toUpperCase();
                     const anakGagal = [];
+                    let adaKonflikAnakDibatalkan = false;
                     
                     for (let i = 0; i < regChildren.length; i++) {
                         let childData = { ...regChildren[i] };
+                        const childOriginalSnapshot = childData._original;
+                        delete childData._original;
                         childData['ID_Keluarga'] = familyData['ID_Keluarga'];
                         
                         // FIX: Deteksi apakah ini anak yang sudah ada sebelumnya di database
@@ -2864,18 +2923,21 @@ const submitArchiveChildren = async () => {
                             childData['ID_Anak'] = `${namaAnak} ${almForChild}`;
                         }
 
+                        const isUpdateAnak = isExistingChild && regModal.mode === 'edit';
                         const payloadAnak = {
                             // FIX: Gunakan isExistingChild penentu action agar anak baru di mode Edit tetap memicu 'create'
-                            action: isExistingChild && regModal.mode === 'edit' ? 'update' : 'create',
+                            action: isUpdateAnak ? 'update' : 'create',
                             sheet: 'Anak',
                             id: childData['ID_Anak'],
                             data: childData,
+                            originalData: isUpdateAnak ? childOriginalSnapshot : undefined,
                             token: token
                         };
-                        const resAnak = await postApi(payloadAnak);
+                        const resAnak = await (isUpdateAnak ? postApiUpdate : postApi)(payloadAnak);
                         // FIX: sebelumnya res tidak dicek -- server bisa balas { success:false, error:"..." }
                         // (misal sistem terkunci/tutup buku) tapi tetap dianggap "berhasil disimpan"
                         if (!resAnak || !resAnak.success) {
+                            if (resAnak && resAnak.isCancelledConflict) adaKonflikAnakDibatalkan = true;
                             anakGagal.push({
                                 nama: childData['NAMA ANAK'] || `Anak ke-${i + 1}`,
                                 error: (resAnak && resAnak.error) || 'Tidak ada respons dari server'
@@ -2883,6 +2945,7 @@ const submitArchiveChildren = async () => {
                         }
                     }
                     
+                    if (adaKonflikAnakDibatalkan) refresh();
                     if (anakGagal.length > 0) {
                         // Data Keluarga (dan mungkin sebagian Anak) sudah tersimpan -- refresh dulu
                         // supaya admin lihat state terbaru sebelum mencoba ulang yang gagal.
