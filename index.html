@@ -338,7 +338,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         // ============================================================
         // 🚀 VERSI APLIKASI (UBAH ANGKA INI SETIAP KALI ADA UPDATE KODE)
         // ============================================================
-        const APP_VERSION = "1.1.38-PERISAI-SECURITY";
+        const APP_VERSION = "1.1.39-AUTO-REFRESH-DATA";
 
         // ============================================================
         // ⚠️ SANGAT PENTING: GANTI TEKS DI BAWAH DENGAN URL WEB APP ANDA
@@ -1991,6 +1991,30 @@ const submitArchiveChildren = async () => {
                 const interval = setInterval(() => { fetchSystemStatus(); }, 120000);
                 return () => clearInterval(interval);
             }, [role, fetchSystemStatus]);
+
+            // 🆕 AUTO-REFRESH DATA BERKALA (tiap 3 menit) SELAMA SESI MASIH LOGIN.
+            // Sebelumnya data (Keluarga/Anak/dll) hanya ditarik SEKALI saat login, jadi
+            // kalau HP tidak logout (misal karena masih aktif dipakai sehingga timer
+            // auto-logout 60 menit terus ke-reset), data lama tetap tampil terus walau
+            // sudah dihapus/diubah di perangkat lain. Refresh berkala ini memastikan
+            // data selalu sinkron dengan server tanpa perlu logout manual.
+            useEffect(() => {
+                if (!role) return;
+                const dataRefreshInterval = setInterval(() => { refresh(); }, 180000); // 3 menit
+                return () => clearInterval(dataRefreshInterval);
+            }, [role, refresh]);
+
+            // 🆕 REFRESH DATA SAAT TAB/APLIKASI KEMBALI TERLIHAT (misal user balik dari
+            // background/kunci layar), supaya begitu dibuka lagi data langsung terbaru
+            // tanpa menunggu interval 3 menit di atas.
+            useEffect(() => {
+                if (!role) return;
+                const handleVisibilityRefresh = () => {
+                    if (!document.hidden) refresh();
+                };
+                document.addEventListener('visibilitychange', handleVisibilityRefresh);
+                return () => document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+            }, [role, refresh]);
 
             useEffect(() => {
                 if (!role) return;
