@@ -920,7 +920,19 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [monthDetailModal, setMonthDetailModal] = useState({ open: false, type: '', list: [] });
 
             // STATE APLIKASI
-            const [tab, setTab] = useState('home');
+            // Kalau dibuka embed dari YASSA Hub dengan ?tab=..., langsung buka ke
+            // tab itu (mis. Hub kirim ?tab=keluarga buat buka "Data KK" langsung),
+            // tanpa perlu klik ulang di dalam Mobile. Di luar mode embed, selalu 'home'.
+            const [tab, setTab] = useState(() => {
+                if (isEmbedMode) {
+                    try {
+                        const requestedTab = new URLSearchParams(window.location.search).get('tab');
+                        const validTabs = ['home', 'keluarga', 'perisai', 'anak', 'aksi'];
+                        if (requestedTab && validTabs.includes(requestedTab)) return requestedTab;
+                    } catch (e) {}
+                }
+                return 'home';
+            });
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
             const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [], prestasi: [] });
             const [loading, setLoading] = useState(false);
