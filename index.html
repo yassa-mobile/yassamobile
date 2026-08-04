@@ -406,6 +406,20 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             }
         }; 
         
+        // ============================================================
+        // 🖼️ MODE EMBED — dipanggil dari YASSA Hub lewat iframe (?embed=1)
+        // Kalau embed=1, header & bottom nav bawaan Mobile disembunyikan
+        // biar gak dobel chrome dengan header/nav Hub. Login & data tetap
+        // pakai sistem Mobile sendiri, tidak ada yang diubah di sisi itu.
+        // ============================================================
+        const isEmbedMode = (() => {
+            try {
+                return new URLSearchParams(window.location.search).get('embed') === '1';
+            } catch (e) {
+                return false;
+            }
+        })();
+
         // GitHub Pages: URL GAS sudah dikonfigurasi di atas
 
         const getVal = (obj, key) => {
@@ -3037,7 +3051,8 @@ const submitArchiveChildren = async () => {
                 return (
                     <div className="fixed inset-0 overflow-y-auto overscroll-none z-50 text-[#1b1c1c] antialiased flex flex-col relative" style={{ backgroundColor: '#f0f0f0', fontFamily: "'Plus Jakarta Sans', 'Hanken Grotesk', sans-serif" }}>
                         
-                        {/* Header (TopAppBar) */}
+                        {/* Header (TopAppBar) — disembunyikan kalau dibuka embed di iframe Hub */}
+                        {!isEmbedMode && (
                         <header className="fixed w-full top-0 left-0 z-50 bg-[#f0f0f0]/80 backdrop-blur-md">
                             <div className="flex justify-between items-center px-5 h-14 max-w-md mx-auto w-full relative">
                                 <button className="text-[#4caf50] w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm border border-white/50 hover:scale-105 active:scale-95 transition-all">
@@ -3047,9 +3062,10 @@ const submitArchiveChildren = async () => {
                                 <div className="w-8 h-8"></div>
                             </div>
                         </header>
+                        )}
 
                         {/* Pembungkus Main diubah agar bisa di-scroll jika layar terlalu pendek */}
-                        <main className="flex-1 flex flex-col items-center px-5 pt-20 pb-24 max-w-md mx-auto w-full min-h-screen">
+                        <main className={`flex-1 flex flex-col items-center px-5 max-w-md mx-auto w-full min-h-screen ${isEmbedMode ? 'pt-6 pb-6' : 'pt-20 pb-24'}`}>
                             <div className="w-full my-auto flex flex-col items-center">
                             
                             {/* Logo - Dipaksa rata tengah dengan jarak seimbang */}
@@ -3178,7 +3194,8 @@ const submitArchiveChildren = async () => {
                             </div>
                         </main>
 
-                        {/* Bottom Navigation */}
+                        {/* Bottom Navigation — disembunyikan kalau dibuka embed di iframe Hub */}
+                        {!isEmbedMode && (
                         <nav className="fixed bottom-0 left-0 w-full z-50 bg-[#f0f0f0]/90 backdrop-blur-xl border-t border-white/50 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
                             <div className="flex justify-around items-center pt-2 pb-3 px-8 max-w-md mx-auto w-full relative">
                                 {/* Tombol Bantuan - Tautan ke WA Admin */}
@@ -3193,6 +3210,7 @@ const submitArchiveChildren = async () => {
                                 </button>
                             </div>
                         </nav>
+                        )}
                     </div>
                 );
             }
@@ -3610,6 +3628,7 @@ const submitArchiveChildren = async () => {
                         </div>
                     )}
 
+                    {!isEmbedMode && (
                     <header className="bg-[#E0E5EC] px-5 py-3 border-none flex justify-between items-center z-30 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] shrink-0 no-print">
                         <div className="flex items-center gap-3">
                             <YassaLogo size={45} mode="mini" />
@@ -3625,10 +3644,11 @@ const submitArchiveChildren = async () => {
                              {role === 'admin' && <button onClick={() => { setRegFamily({}); setRegChildren([]); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }} className="p-3 bg-green-600 text-white rounded-2xl shadow-lg btn-active transition-all"><Icon name="plus-circle" size={18} /></button>}
                         </div>
                     </header>
+                    )}
 
                     {msg && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white px-6 py-3 rounded-full text-[11px] font-bold text-center shadow-2xl animate-bounce whitespace-nowrap no-print">{msg}</div>}
 
-                    <main id="scroll-area" className="flex-1 overflow-y-auto p-5 pb-44 no-scrollbar fade-in relative print-container">
+                    <main id="scroll-area" className={`flex-1 overflow-y-auto p-5 no-scrollbar fade-in relative print-container ${isEmbedMode ? 'pb-8' : 'pb-44'}`}>
                         
                         {tab === 'home' && (
                             <div className="space-y-6 fade-in no-print">
@@ -7131,6 +7151,7 @@ const submitArchiveChildren = async () => {
                         );
                     })()}
 
+                    {!isEmbedMode && (
                     <nav className="fixed bottom-0 left-0 right-0 bg-[#E0E5EC] border-none flex justify-around items-end shadow-[0_-6px_16px_rgb(163,177,198,0.5),0_-6px_16px_rgba(255,255,255,0.7)] z-40 h-[75px] pb-2 px-2 shrink-0 no-print">
                         {[ 
                             { id: 'home', icon: 'home', label: 'Beranda' }, 
@@ -7178,6 +7199,7 @@ const submitArchiveChildren = async () => {
                             );
                         })}
                     </nav>
+                    )}
 
                     {/* MODAL REGISTRASI & EDIT */}
                     {regModal.open && (
