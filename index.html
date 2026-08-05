@@ -765,12 +765,13 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
 
             // ============================================================
             // 🔗 SSO AUTO-LOGIN — dipicu kalau ada ?sso=... di URL (dibuka
-            // dari YASSA Hub). Cuma jalan SEKALI pas komponen mount, dan
-            // cuma kalau belum ada sesi aktif (role kosong).
+            // dari YASSA Hub). Cuma jalan SEKALI pas komponen mount.
             // ============================================================
             React.useEffect(() => {
                 if (!ssoTokenFromUrl) return;
-                if (role) return; // sudah login (mis. refresh halaman), gak perlu SSO lagi
+                // PERBAIKAN: Baris "if (role) return;" DIHAPUS agar setiap ada tiket
+                // baru dari YASSA Hub, sistem akan SELALU memprosesnya dan menimpa 
+                // sisa memori login akun lama di perangkat ini.
 
                 let batal = false;
                 (async () => {
