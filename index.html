@@ -420,6 +420,21 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             }
         })();
 
+        // ============================================================
+        // 🔗 SSO — tiket sekali-pakai dari YASSA Hub (?sso=...), biar user
+        // yang sudah login di Hub tidak perlu login manual lagi di sini.
+        // Login & data TETAP pakai sistem Mobile sendiri sepenuhnya --
+        // lihat handleSsoLogin() di Code.gs, hak akses gak berubah sama
+        // sekali (backend yang jamin, bukan cuma frontend ini).
+        // ============================================================
+        const ssoTokenFromUrl = (() => {
+            try {
+                return new URLSearchParams(window.location.search).get('sso');
+            } catch (e) {
+                return null;
+            }
+        })();
+
         // GitHub Pages: URL GAS sudah dikonfigurasi di atas
 
         const getVal = (obj, key) => {
@@ -747,6 +762,71 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [loginError, setLoginError] = useState('');
+
+            // ============================================================
+            // 🔗 SSO AUTO-LOGIN — dipicu kalau ada ?sso=... di URL (dibuka
+            // dari YASSA Hub). Cuma jalan SEKALI pas komponen mount, dan
+            // cuma kalau belum ada sesi aktif (role kosong).
+            // ============================================================
+            React.useEffect(() => {
+                if (!ssoTokenFromUrl) return;
+                if (role) return; // sudah login (mis. refresh halaman), gak perlu SSO lagi
+
+                let batal = false;
+                (async () => {
+                    setLoading('MASUK OTOMATIS DARI HUB...');
+                    setLoginError('');
+                    try {
+                        const res = await postApi({ action: 'ssoLogin', ssoToken: ssoTokenFromUrl });
+                        if (!batal && res && res.success && res.data) {
+                            const d = res.data;
+                            setRole(d.role);
+                            setUserWilayah(d.wilayah);
+                            setActiveUser(d.username || '');
+                            setUserFullName(d.fullName || '');
+                            setIsSuperAdminControl(!!d.isSuperAdminControl);
+
+                            if (d.token) yassaStore.set('yassa-token', d.token);
+                            yassaStore.set('yassa-role', d.role);
+                            yassaStore.set('yassa-wilayah', d.wilayah);
+                            yassaStore.set('yassa-username', d.username || '');
+                            yassaStore.set('yassa-fullname', d.fullName || '');
+                            yassaStore.set('yassa-active-user', d.username || '');
+                            yassaStore.set('yassa-super-admin-control', d.isSuperAdminControl ? 'true' : 'false');
+
+                            let finalFotoUrl = (d.linkFoto || '').toString().trim();
+                            if (!finalFotoUrl) {
+                                finalFotoUrl = 'https://drive.google.com/thumbnail?id=1Jyj8wXcg0lJZtoT-lwZxwBdexBIMEDAA';
+                            }
+                            setUserFotoUrl(finalFotoUrl);
+                            yassaStore.set('yassa-foto', finalFotoUrl);
+
+                            setTab('home');
+                            try { sendLog(d.username || '', d.role, d.wilayah, 'Berhasil Login (SSO dari Hub)'); } catch (e) {}
+
+                            try {
+                                if ('Notification' in window && 'serviceWorker' in navigator) {
+                                    if (typeof initPushNotification === 'function') initPushNotification(d.username || '');
+                                }
+                            } catch (e) { console.log('FCM Error diabaikan:', e); }
+                        } else if (!batal) {
+                            // Tiket gagal/basi -- diamkan saja, biarkan user login manual seperti biasa
+                            // (jangan tampilkan error yang bikin bingung sebelum user sempat coba apa-apa).
+                            console.log('SSO gagal:', res && res.error);
+                        }
+                    } catch (e) {
+                        console.log('SSO error:', e);
+                    }
+                    // Bersihkan ?sso=... dari URL supaya tiket (sekali-pakai) tidak
+                    // ketinggalan di address bar & tidak dicoba lagi kalau di-refresh.
+                    try {
+                        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+                    } catch (e) {}
+                    if (!batal) setLoading(false);
+                })();
+
+                return () => { batal = true; };
+            }, []); // cuma jalan sekali pas komponen ini pertama kali muncul
 
             // --- MULAI KODE BARU: INISIALISASI LOGIN GOOGLE ---
             React.useEffect(() => {
