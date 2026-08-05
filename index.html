@@ -7742,10 +7742,27 @@ return (
   firebase.initializeApp(firebaseConfig);
   const messaging = firebase.messaging();
 
+  // 📣 Lapor balik ke Hub (kalau app ini dibuka lewat window.open() dari
+  // Hub, window.opener bakal terisi otomatis) soal status izin notifikasi.
+  // Dipakai supaya tombol "Aktifkan Notifikasi" di Hub bisa tahu beneran
+  // izinnya granted/denied, bukan cuma nebak dari localStorage sendiri.
+  function notifyHubNotifStatus(status) {
+    try {
+      if (window.opener) {
+        window.opener.postMessage({ type: 'yassa-mobile-notif-status', status: status }, '*');
+      }
+    } catch (e) {
+      console.log('[FCM] Gagal lapor status ke Hub:', e);
+    }
+  }
+
   async function initPushNotification(usernameParam) {
     try {
       const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
+      if (permission !== 'granted') {
+        notifyHubNotifStatus(permission); // 'denied' atau 'default'
+        return;
+      }
       const token = await messaging.getToken({
         vapidKey: (typeof YASSA_CONFIG !== 'undefined' ? YASSA_CONFIG.FCM_VAPID : 'BHIK0YI29D_A7VoUrVQ7kSbCe7BpGbYIvvZn0KX50a2CXWAfNubkRQlhKK3jDMOsKFYUL7mHKoQDh2XtsanW6KA'),
         serviceWorkerRegistration: await navigator.serviceWorker.ready
@@ -7753,9 +7770,13 @@ return (
       if (token) {
         console.log('[FCM] Token berhasil didapat ✅');
         await subscribeToTopic(token, usernameParam);
+        notifyHubNotifStatus('granted');
+      } else {
+        notifyHubNotifStatus('error');
       }
     } catch (err) {
       console.error('[FCM] Error init:', err);
+      notifyHubNotifStatus('error');
     }
   }
 
