@@ -2549,14 +2549,14 @@ const submitArchiveChildren = async () => {
                 const activeKkSet = {}; 
 
                 if (!regionAnalysisFilter) {
-                    data.keluarga.forEach(f => {
+                    dataGlobal.keluarga.forEach(f => {
                         const w = (getVal(f, 'WILAYAH') || 'Lainnya').trim().toUpperCase();
                         if(!map[w]) map[w] = { kk: 0, yt: 0, yp: 0, dsb: 0 };
                         map[w].kk++;
                     });
                 }
 
-                data.anak.forEach(c => {
+                dataGlobal.anak.forEach(c => {
                     const prog = (getVal(c, 'PROGRAM') || '').toLowerCase();
                     const isSapa = prog.includes('sapa') || prog.includes('asuh') || prog.includes('ota');
                     const isGopay = prog.includes('gopay');
@@ -2569,7 +2569,7 @@ const submitArchiveChildren = async () => {
                     if (!matchFilter) return;
 
                     const famIdNorm = norm(getVal(c, 'ID_Keluarga'));
-                    const fam = familyLookupMap[famIdNorm];
+                    const fam = familyLookupMapGlobal[famIdNorm];
                     const w = fam ? (getVal(fam, 'WILAYAH') || 'Lainnya').trim().toUpperCase() : 'Lainnya';
 
                     if (!map[w]) map[w] = { kk: 0, yt: 0, yp: 0, dsb: 0 };
@@ -2589,12 +2589,12 @@ const submitArchiveChildren = async () => {
                     Object.keys(activeKkSet).forEach(w => {
                         map[w].kk = activeKkSet[w].size; 
                         activeKkSet[w].forEach(fid => {
-                            const f = familyLookupMap[fid];
+                            const f = familyLookupMapGlobal[fid];
                             if (f && String(getVal(f, 'KATAGORI ISTRI')).toLowerCase().includes('disabilitas')) map[w].dsb++;
                         });
                     });
                 } else {
-                    data.keluarga.forEach(f => {
+                    dataGlobal.keluarga.forEach(f => {
                         const w = (getVal(f, 'WILAYAH') || 'Lainnya').trim().toUpperCase();
                         if (String(getVal(f, 'KATAGORI ISTRI')).toLowerCase().includes('disabilitas')) {
                             if (map[w]) map[w].dsb++;
@@ -2606,7 +2606,7 @@ const submitArchiveChildren = async () => {
                     .map(([wilayah, d]) => ({ wilayah, ...d }))
                     .filter(w => !(w.wilayah.toUpperCase() === 'LAINNYA' && w.yt === 0 && w.yp === 0 && w.dsb === 0))
                     .sort((a, b) => b.kk - a.kk);
-            }, [data, regionAnalysisFilter, familyLookupMap]);
+            }, [dataGlobal, regionAnalysisFilter, familyLookupMapGlobal]);
 
             const updateSearchResults = useMemo(() => {
                 const hasQuery = updateSearchQuery && updateSearchQuery.trim().length >= 2;
