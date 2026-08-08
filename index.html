@@ -802,7 +802,14 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                             setUserFotoUrl(finalFotoUrl);
                             yassaStore.set('yassa-foto', finalFotoUrl);
 
-                            setTab('home');
+                            // 🩹 FIX: dulu di sini selalu dipaksa setTab('home'), jadi tab yang
+                            // udah bener kebaca dari ?tab=... (mis. "aksi" buat menu Profil)
+                            // ketiban lagi balik ke Beranda begitu SSO login selesai. Sekarang
+                            // cuma reset ke 'home' kalau BUKAN mode embed dari Hub -- kalau
+                            // embed, biarin tab yang udah di-set dari URL Hub tetap dipakai.
+                            if (!isEmbedMode) {
+                                setTab('home');
+                            }
                             try { sendLog(d.username || '', d.role, d.wilayah, 'Berhasil Login (SSO dari Hub)'); } catch (e) {}
 
                             // PENTING: JANGAN cuma ngandelin useEffect([role,...]) di bawah buat
