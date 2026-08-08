@@ -338,7 +338,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         // ============================================================
         // 🚀 VERSI APLIKASI (UBAH ANGKA INI SETIAP KALI ADA UPDATE KODE)
         // ============================================================
-        const APP_VERSION = "1.1.39-AUTO-REFRESH-DATA";
+        const APP_VERSION = "1.1.40-READBUNDLE-FAST-LOAD";
 
         // ============================================================
         // ⚠️ SANGAT PENTING: GANTI TEKS DI BAWAH DENGAN URL WEB APP ANDA
@@ -1029,33 +1029,58 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             // STATE BUKA/TUTUP KARTU ARSIP DOKUMEN (per ID_Keluarga) di Katalog Anak
             const [expandedArsipCard, setExpandedArsipCard] = useState({});
 
-// FUNGSI REFRESH (Diperbarui agar membaca sheet Arsip_Anak)
+// FUNGSI REFRESH (⚡ DIOPTIMASI: 1x request 'readBundle', bukan 9 request paralel)
+// Sebelumnya refresh() nembak 9 request POST terpisah ke GAS secara paralel --
+// tiap request punya overhead startup sendiri-sendiri di server, jadi totalnya
+// numpuk dan loading bisa 1 menit lebih. Sekarang cukup 1x request ke action
+// 'readBundle' yang membaca semua sheet itu dalam SATU eksekusi backend.
+// Kalau readBundle gagal total (mis. deployment lama belum ter-update), ada
+// fallback otomatis balik ke cara lama (9 request) supaya app tetap jalan.
 const refresh = useCallback(async () => {
                 if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
                 setLoading("MENGAMBIL DATA...");
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
-                    const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi, resGlobal] = await Promise.all([
-                        postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
-                        postApi({ action: 'read', sheet: 'Anak', token: tkn }),
-                        postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
-                        postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
-                        // 🆕 Riwayat pemilihan "10 Amplop" (dibuat oleh app Pemilihan Kel Alm, sheet sama)
-                        // Dipakai untuk pewarnaan otomatis BIRU/KUNING di Buku Induk.
-                        postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []})),
-                        // 🏆 [BARU] Data prestasi akademik/non-akademik anak asuh
-                        postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []})),
-                        // 📊 [BARU] Data GLOBAL semua wilayah khusus tab Beranda (lihat catatan di useState dataGlobal)
-                        postApi({ action: 'readDashboardGlobal', token: tkn }).catch(() => ({success: true, data: { keluarga: [], anak: [], arsipAnak: [] }}))
-                    ]);
-                    
-                    if (resK.success && resA.success) {
-                        setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] });
-                    }
-                    if (resGlobal && resGlobal.success) {
-                        setDataGlobal({ keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] });
+                    const resBundle = await postApi({ action: 'readBundle', token: tkn });
+
+                    if (resBundle && resBundle.success) {
+                        const b = resBundle.data || {};
+                        setData({
+                            keluarga: b.keluarga || [],
+                            anak: b.anak || [],
+                            pengurus: b.pengurus || [],
+                            pengumuman: b.pengumuman || [],
+                            arsipAnak: b.arsipAnak || [],
+                            arsip: b.arsip || [],
+                            riwayatAmplop: b.riwayatAmplop || [],
+                            prestasi: b.prestasi || []
+                        });
+                        setDataGlobal({
+                            keluarga: b.global?.keluarga || [],
+                            anak: b.global?.anak || [],
+                            arsipAnak: b.global?.arsipAnak || []
+                        });
+                    } else {
+                        // 🔁 FALLBACK: deployment backend belum punya action 'readBundle'
+                        // (misal belum di-update) -- pakai cara lama sebagai jaring pengaman.
+                        const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi, resGlobal] = await Promise.all([
+                            postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
+                            postApi({ action: 'read', sheet: 'Anak', token: tkn }),
+                            postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
+                            postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
+                            postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
+                            postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
+                            postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []})),
+                            postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []})),
+                            postApi({ action: 'readDashboardGlobal', token: tkn }).catch(() => ({success: true, data: { keluarga: [], anak: [], arsipAnak: [] }}))
+                        ]);
+
+                        if (resK.success && resA.success) {
+                            setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] });
+                        }
+                        if (resGlobal && resGlobal.success) {
+                            setDataGlobal({ keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] });
+                        }
                     }
                 } catch (e) { 
                     setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
