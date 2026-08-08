@@ -1036,6 +1036,22 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 }
                 return 'home';
             });
+
+            // 🆕 DENGARKAN postMessage "YASSA_HUB_NAVIGATE" dari YASSA Hub -- ini
+            // yang bikin pindah menu (mis. Beranda -> Profil) TIDAK perlu reload
+            // ulang lagi selama app ini masih hidup di iframe Hub (Hub cuma minta
+            // tiket SSO baru sekali di awal, abis itu pindah tab lewat pesan ini).
+            React.useEffect(() => {
+                if (!isEmbedMode) return;
+                function handleHubNavigate(e) {
+                    if (!e.data || e.data.type !== 'YASSA_HUB_NAVIGATE') return;
+                    const validTabs = ['home', 'keluarga', 'perisai', 'anak', 'aksi'];
+                    if (validTabs.includes(e.data.tab)) setTab(e.data.tab);
+                }
+                window.addEventListener('message', handleHubNavigate);
+                return () => window.removeEventListener('message', handleHubNavigate);
+            }, [isEmbedMode]);
+
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
             const [data, setData] = useState({ keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [], prestasi: [] });
             // 🆕 DATA GLOBAL (semua wilayah, TANPA filter) -- KHUSUS buat tab
