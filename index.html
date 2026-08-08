@@ -805,6 +805,21 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                             setTab('home');
                             try { sendLog(d.username || '', d.role, d.wilayah, 'Berhasil Login (SSO dari Hub)'); } catch (e) {}
 
+                            // PENTING: JANGAN cuma ngandelin useEffect([role,...]) di bawah buat
+                            // narik data. Kalau role hasil SSO ini SAMA PERSIS (string-nya) sama
+                            // role yang udah ke-load dari localStorage pas mount awal (device ini
+                            // pernah login manual sebelumnya), React nganggep state "gak berubah"
+                            // dan effect itu TIDAK ke-trigger ulang -- padahal token yang dipakai
+                            // pas mount awal tadi bisa aja udah basi/expired. Makanya refresh()
+                            // (dan fetcher lain) dipanggil eksplisit di sini, pakai token BARU
+                            // yang barusan disimpan ke localStorage di atas.
+                            try {
+                                refresh();
+                                if (typeof fetchBankDictionary === 'function') fetchBankDictionary();
+                                if (typeof fetchKorwilEmailMap === 'function') fetchKorwilEmailMap();
+                                if (typeof fetchSystemStatus === 'function') fetchSystemStatus();
+                            } catch (e) { console.log('Refresh pasca-SSO gagal:', e); }
+
                             try {
                                 if ('Notification' in window && 'serviceWorker' in navigator) {
                                     if (typeof initPushNotification === 'function') initPushNotification(d.username || '');
