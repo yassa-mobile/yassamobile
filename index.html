@@ -7322,7 +7322,12 @@ const submitArchiveChildren = async () => {
                             ...((role === 'admin' || role === 'korwil' || role === 'pengurus') 
                                 ? [ { id: 'keluarga', icon: 'list', label: 'Data KK' } ] 
                                 : [ { id: 'empty1', hidden: true } ]), 
-                            { id: 'perisai', icon: 'shield', label: 'Kontrol', isCenter: true }, 
+                            // PENTING: sebelumnya tab "Kontrol" ini TIDAK ADA pengecekan role
+                            // sama sekali -- muncul ke SEMUA orang termasuk Tim Kerja/Relawan.
+                            // Sekarang digating sama kayak Data KK/Data Anak (admin/korwil/pengurus).
+                            ...((role === 'admin' || role === 'korwil' || role === 'pengurus')
+                                ? [ { id: 'perisai', icon: 'shield', label: 'Kontrol', isCenter: true } ]
+                                : [ { id: 'empty3', hidden: true } ]),
                             ...((role === 'admin' || role === 'korwil' || role === 'pengurus') 
                                 ? [ { id: 'anak', icon: 'users', label: 'Data Anak' } ] 
                                 : [ { id: 'empty2', hidden: true } ]), 
