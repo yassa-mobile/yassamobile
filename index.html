@@ -821,7 +821,14 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                             // (dan fetcher lain) dipanggil eksplisit di sini, pakai token BARU
                             // yang barusan disimpan ke localStorage di atas.
                             try {
-                                refresh();
+                                // 🩹 FIX: dulu refresh() dipanggil TANPA "await", jadi
+                                // setLoading(false) di bawah (akhir blok ini) langsung jalan
+                                // duluan sebelum data-nya kelar diambil -- akibatnya layar
+                                // loading hilang duluan, Beranda tampil kosong, baru ~15 detik
+                                // kemudian data "muncul tiba-tiba" pas refresh() beneran
+                                // selesai. Sekarang di-await biar loading tetap tampil sampai
+                                // datanya beneran siap.
+                                await refresh();
                                 if (typeof fetchBankDictionary === 'function') fetchBankDictionary();
                                 if (typeof fetchKorwilEmailMap === 'function') fetchKorwilEmailMap();
                                 if (typeof fetchSystemStatus === 'function') fetchSystemStatus();
