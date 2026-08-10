@@ -77,14 +77,19 @@
 
     /* ============================================================ */
     /* MODE MALAM (DARK MODE)                                        */
+    /* Trik filter invert+hue-rotate: seluruh UI terang (termasuk    */
+    /* efek neumorphic shadow timbul) otomatis kebalik jadi gelap,   */
+    /* tanpa perlu ubah warna satu-satu di ribuan baris JSX.         */
+    /* saturate+brightness+contrast ditambah biar condong navy       */
+    /* (senada tema Yassa Hub), bukan cuma hitam abu polos.          */
     /* ============================================================ */
     body.dark-mode {
-        filter: invert(1) hue-rotate(180deg);
+        filter: invert(1) hue-rotate(200deg) saturate(1.25) brightness(0.94) contrast(0.96);
         background-color: #f8fafc;
     }
     body.dark-mode img,
     body.dark-mode video {
-        filter: invert(1) hue-rotate(180deg);
+        filter: invert(1) hue-rotate(200deg) saturate(1.25) brightness(0.94) contrast(0.96);
     }
     body.dark-mode {
         transition: filter 0.2s ease;
@@ -792,6 +797,23 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [loginError, setLoginError] = useState('');
 
             // ============================================================
+            // 🚪 GERBANG PENGALIHAN KE YASSA HUB
+            // Yassa Mobile sekarang jadi "backend" — akses normal user
+            // dialihkan ke Hub. Admin masih bisa masuk langsung lewat
+            // ?admin=1 di URL, atau kalau sudah pernah klik lanjut (disimpan
+            // di localStorage supaya tidak ditanya ulang tiap buka).
+            // ============================================================
+            const params = new URLSearchParams(window.location.search);
+            const adminBypassUrl = params.get('admin') === '1';
+            const [adminBypass, setAdminBypass] = useState(
+                adminBypassUrl || localStorage.getItem('yassa-mobile-admin-bypass') === 'true'
+            );
+            const lanjutSebagaiAdmin = () => {
+                localStorage.setItem('yassa-mobile-admin-bypass', 'true');
+                setAdminBypass(true);
+            };
+
+            // ============================================================
             // 🔗 SSO AUTO-LOGIN — dipicu kalau ada ?sso=... di URL (dibuka
             // dari YASSA Hub). Cuma jalan SEKALI pas komponen mount.
             // ============================================================
@@ -1036,8 +1058,14 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [updateTargetTab, setUpdateTargetTab] = useState('profil'); // 'profil' atau 'rekening' - menentukan tab yg terbuka setelah pilih hasil pencarian
 
             // STATE MODE MALAM (DARK MODE)
+            // 🌙 Default sekarang GELAP (nyambung sama tema Yassa Hub yang navy).
+            // User tetap bisa switch ke terang lewat tombol toggle, pilihannya
+            // disimpan di localStorage dan dipakai lagi di kunjungan berikutnya.
             const [darkMode, setDarkMode] = useState(() => {
-                try { return localStorage.getItem('yassa-dark-mode') === '1'; } catch (e) { return false; }
+                try {
+                    const saved = localStorage.getItem('yassa-dark-mode');
+                    return saved === null ? true : saved === '1';
+                } catch (e) { return true; }
             });
             React.useEffect(() => {
                 try {
@@ -3268,6 +3296,37 @@ const submitArchiveChildren = async () => {
                         </div>
                         
                         <p className="text-slate-400 text-[11px] font-medium tracking-wide animate-pulse">{splashTeks}</p>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // 🚪 GATE PENGALIHAN KE YASSA HUB
+            // Tampil kalau: belum login, BUKAN dibuka embed dari Hub (iframe),
+            // BUKAN datang dari tiket SSO Hub, dan admin belum klik "lanjut".
+            // ============================================================
+            if (!role && !isEmbedMode && !ssoTokenFromUrl && !adminBypass) {
+                return (
+                    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center px-6 text-center" style={{ background: 'radial-gradient(circle at 50% 0%, #1a2332 0%, #0B0F19 60%)', fontFamily: "'Plus Jakarta Sans', 'Hanken Grotesk', sans-serif" }}>
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                            <span className="text-3xl">🔀</span>
+                        </div>
+                        <h1 className="text-white text-xl font-bold mb-2">Yassa Mobile sudah pindah</h1>
+                        <p className="text-slate-400 text-sm leading-relaxed max-w-xs mb-8">
+                            Sekarang semua akses dilakukan lewat <span className="text-emerald-400 font-semibold">Yassa Hub</span>. Silakan buka aplikasi lewat Hub ya.
+                        </p>
+                        <a
+                            href="https://yayasansalamsatuaspaldc-eng.github.io/YASSA-Hub/"
+                            className="w-full max-w-xs bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] transition text-[#0B0F19] font-bold text-sm py-3.5 rounded-xl shadow-[0_8px_24px_rgba(16,185,129,0.35)] mb-3"
+                        >
+                            Buka Yassa Hub
+                        </a>
+                        <button
+                            onClick={lanjutSebagaiAdmin}
+                            className="text-slate-600 hover:text-slate-400 text-xs font-medium py-2 transition"
+                        >
+                            Lanjut ke Yassa Mobile (Admin)
+                        </button>
                     </div>
                 );
             }
