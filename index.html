@@ -1033,6 +1033,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [updateDataOpen, setUpdateDataOpen] = useState(false);
             const [updateSearchQuery, setUpdateSearchQuery] = useState('');
             const [updateSearchWilayah, setUpdateSearchWilayah] = useState('');
+            const [updateTargetTab, setUpdateTargetTab] = useState('profil'); // 'profil' atau 'rekening' - menentukan tab yg terbuka setelah pilih hasil pencarian
 
             // STATE MODE MALAM (DARK MODE)
             const [darkMode, setDarkMode] = useState(() => {
@@ -3102,11 +3103,11 @@ const submitArchiveChildren = async () => {
                 }
             };
 
-            const openEditFamily = (f) => {
+            const openEditFamily = (f, startTab) => {
                 // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
                 if (role !== 'admin') {
                     setRegFamily(f);
-                    setRegModal({ open: true, step: 1, mode: 'view' }); setErrorMsg('');
+                    setRegModal({ open: true, step: 1, mode: 'view', familyTab: startTab }); setErrorMsg('');
                     return;
                 }
                 // 🆕 Simpan snapshot data ASLI saat form dibuka (untuk deteksi konflik
@@ -3116,7 +3117,7 @@ const submitArchiveChildren = async () => {
                 setRegFamily({ ...f, _original: { ...f } });
                 const relatedChildren = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                 setRegChildren(relatedChildren.length > 0 ? relatedChildren.map(c => ({ ...c, _original: { ...c } })) : []);
-                setRegModal({ open: true, step: 1, mode: 'edit' }); setErrorMsg('');
+                setRegModal({ open: true, step: 1, mode: 'edit', familyTab: startTab }); setErrorMsg('');
             };
 
             const openEditChild = (c) => {
@@ -4366,7 +4367,7 @@ const submitArchiveChildren = async () => {
                                 {role === 'admin' && (
                                     <div className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] transition-all overflow-hidden">
                                         <button
-                                            onClick={() => { const next = !updateDataOpen; setUpdateDataOpen(next); if (!next) { setUpdateSearchQuery(''); setUpdateSearchWilayah(''); } }}
+                                            onClick={() => { const next = !updateDataOpen; setUpdateDataOpen(next); if (!next) { setUpdateSearchQuery(''); setUpdateSearchWilayah(''); setUpdateTargetTab('profil'); } }}
                                             className="w-full p-6 flex items-center gap-5 text-left active:scale-[0.98] transition-all"
                                         >
                                             <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
@@ -4381,6 +4382,24 @@ const submitArchiveChildren = async () => {
 
                                         {updateDataOpen && (
                                             <div className="px-6 pb-6 fade-in">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Mau update apa?</p>
+                                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setUpdateTargetTab('profil')}
+                                                        className={`py-3 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${updateTargetTab === 'profil' ? 'bg-white text-emerald-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'bg-[#E0E5EC] text-slate-400 shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]'}`}
+                                                    >
+                                                        Profil / Alamat
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setUpdateTargetTab('rekening')}
+                                                        className={`py-3 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${updateTargetTab === 'rekening' ? 'bg-white text-blue-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'bg-[#E0E5EC] text-slate-400 shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]'}`}
+                                                    >
+                                                        Rekening / Bank
+                                                    </button>
+                                                </div>
+
                                                 <div className="bg-[#E0E5EC] rounded-2xl shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] flex items-center gap-2 px-4 py-3 mb-3">
                                                     <Icon name="search" size={16} className="text-slate-400 shrink-0" />
                                                     <input
@@ -4420,7 +4439,7 @@ const submitArchiveChildren = async () => {
                                                     {updateSearchResults.map((f, i) => (
                                                         <button
                                                             key={i}
-                                                            onClick={() => { openEditFamily(f); setUpdateDataOpen(false); setUpdateSearchQuery(''); setUpdateSearchWilayah(''); }}
+                                                            onClick={() => { openEditFamily(f, updateTargetTab); setUpdateDataOpen(false); setUpdateSearchQuery(''); setUpdateSearchWilayah(''); setUpdateTargetTab('profil'); }}
                                                             className="w-full bg-[#E0E5EC] rounded-2xl shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all px-4 py-3 flex items-center justify-between gap-3 text-left"
                                                         >
                                                             <div className="min-w-0">
@@ -7432,13 +7451,17 @@ const submitArchiveChildren = async () => {
                     </nav>
                     )}
 
-                    {/* MODAL REGISTRASI & EDIT */}
+                    {/* MODAL REGISTRASI & EDIT (FULL LAYAR) */}
                     {regModal.open && (
-                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] p-0 sm:p-4 flex items-end sm:items-center justify-center fade-in no-print">
-                            <div className="bg-white w-full sm:max-w-4xl sm:rounded-[2.5rem] rounded-t-[2.5rem] sm:shadow-2xl flex flex-col h-[96vh] sm:h-[85vh] overflow-hidden modal-slide-up">
-                                {/* Header Modal */}
-                                <div className="p-6 border-b bg-slate-50 flex justify-between items-center shrink-0">
-                                    <div>
+                        <div className="fixed inset-0 bg-white z-[100] flex flex-col h-screen w-screen fade-in no-print">
+                            <div className="bg-white w-full flex flex-col h-full overflow-hidden">
+                                {/* Header Full Layar dengan Tombol Kembali */}
+                                <div className="p-5 border-b bg-slate-50 flex items-center gap-4 shrink-0">
+                                    <button onClick={() => setRegModal({ open: false, step: 1, mode: 'add' })} className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-white rounded-2xl shadow-sm hover:bg-slate-100 active:scale-95 border border-slate-200 transition-all">
+                                        <Icon name="arrow-left" size={18} className="text-slate-600" />
+                                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Kembali</span>
+                                    </button>
+                                    <div className="min-w-0">
                                         <h3 className="font-black text-slate-800 uppercase text-sm tracking-wider">
                                             {regModal.mode === 'add' ? 'Registrasi Baru' : (regModal.mode === 'view' ? 'Detail Data' : 'Edit Data')}
                                         </h3>
@@ -7446,9 +7469,6 @@ const submitArchiveChildren = async () => {
                                             {regModal.step === 1 ? 'Langkah 1: Profil Keluarga' : 'Langkah 2: Anak Asuh'}
                                         </p>
                                     </div>
-                                    <button onClick={() => setRegModal({ open: false, step: 1, mode: 'add' })} className="p-2 bg-white rounded-full shadow-sm hover:bg-slate-100 active:scale-95 border border-slate-200 transition-all">
-                                        <Icon name="x" size={18} className="text-slate-500" />
-                                    </button>
                                 </div>
                                 
                                 {/* Indikator Step */}
