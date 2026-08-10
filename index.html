@@ -321,7 +321,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 <div style="position:absolute; top:0; left:0; height:100%; width:50%; background:linear-gradient(to right, #34d399, #22c55e, #059669); border-radius:9999px; box-shadow:0 0 10px rgba(34,197,94,0.5); animation:yassaLoadingBar 1.2s ease-in-out infinite;"></div>
             </div>
 
-            <p style="color:#94a3b8; font-size:11px; font-weight:500; letter-spacing:0.05em; margin:0;">Memuat data...</p>
+            <p style="color:#94a3b8; font-size:11px; font-weight:500; letter-spacing:0.05em; margin:0;">Menyiapkan data — demi mereka yang menunggu...</p>
         </div>
         <style>
             @keyframes yassaLoadingBar {
@@ -749,6 +749,34 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             );
         };
 
+        // ============================================================
+        // KALIMAT MOTIVASI ROTASI -- pengganti teks "Memuat data..." /
+        // "Mengambil data..." yang polos, biar sambil nunggu, yang buka
+        // app diingetin ke misi YASSA (bukan cuma teks netral). Dipisah
+        // 2 daftar:
+        //  - KALIMAT_SPLASH: buat splash screen awal (font kecil, boleh
+        //    agak panjang, gak ditulis huruf besar semua).
+        //  - KALIMAT_OVERLAY_DATA: buat overlay loading (badge kecil,
+        //    ditulis uppercase otomatis oleh CSS, jadi dibikin singkat
+        //    biar gak kepanjangan di badge-nya).
+        // ============================================================
+        const KALIMAT_SPLASH_MOBILE = [
+            "Menghitung berkah untuk anak-anak yatim kita...",
+            "Sedang menjumlahkan kebaikan bulan ini...",
+            "Menyiapkan data — demi mereka yang menunggu...",
+            "Setiap data di sini mewakili harapan seorang anak...",
+            "Menyusun data, seperti kita menyusun kepedulian...",
+        ];
+        const KALIMAT_OVERLAY_DATA_MOBILE = [
+            "Menyiapkan data untuk mereka...",
+            "Sabar sebentar, ini demi anak yatim kita...",
+            "Sedang menjumlahkan kebaikan...",
+            "Semangat, sedikit lagi...",
+        ];
+        function kalimatAcakMobile(daftar) {
+            return daftar[Math.floor(Math.random() * daftar.length)];
+        }
+
         function App() {
             // STATE ROLE & LOGIN 
             const [role, setRole] = useState(yassaStore.get('yassa-role') || '');
@@ -1083,7 +1111,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
 // fallback otomatis balik ke cara lama (9 request) supaya app tetap jalan.
 const refresh = useCallback(async () => {
                 if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
-                setLoading("MENGAMBIL DATA...");
+                setLoading(kalimatAcakMobile(KALIMAT_OVERLAY_DATA_MOBILE));
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
                     const resBundle = await postApi({ action: 'readBundle', token: tkn });
@@ -1504,6 +1532,10 @@ const submitArchiveChildren = async () => {
             // 🆕 STATE SPLASH SCREEN (LOADING AWAL)
             // ============================================================
             const [isSplashVisible, setIsSplashVisible] = useState(true);
+            // Kalimat splash dipilih SEKALI aja pas komponen pertama kali render
+            // (bukan tiap render ulang), biar gak "kedip" ganti kalimat selama
+            // 2.5 detik splash tampil.
+            const [splashTeks] = useState(() => kalimatAcakMobile(KALIMAT_SPLASH_MOBILE));
 
             useEffect(() => {
                 // Hilangkan splash screen setelah 2.5 detik
@@ -3234,7 +3266,7 @@ const submitArchiveChildren = async () => {
                             <div className="absolute top-0 left-0 h-full w-1/2 bg-gradient-to-r from-emerald-400 via-green-500 to-emerald-600 rounded-full anim-loading-bar shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
                         </div>
                         
-                        <p className="text-slate-400 text-[11px] font-medium tracking-wide animate-pulse">Memuat data...</p>
+                        <p className="text-slate-400 text-[11px] font-medium tracking-wide animate-pulse">{splashTeks}</p>
                     </div>
                 );
             }
