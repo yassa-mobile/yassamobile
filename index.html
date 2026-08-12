@@ -1117,18 +1117,16 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             }, [isEmbedMode]);
 
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
-            const [data, setData] = useState(() => {
-                try {
-                    const [data, setData] = useState(() => {
-                try {
-                    const cachedData = localStorage.getItem('yassa_offline_data');
-                    if (cachedData) return JSON.parse(cachedData);
-                } catch (e) {}
-                return { keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [], prestasi: [] };
-            });
-            // 🆕 DATA GLOBAL (semua wilayah, TANPA filter) -- KHUSUS buat tab
-            // Beranda (dashboardStats & analytics GOPAY/SAPA), supaya semua role
-            // lihat angka SE-INDONESIA di Beranda, terlepas dari wilayahAkses-nya.
+                const [data, setData] = useState(() => {
+                    try {
+                        const cachedData = localStorage.getItem('yassa_offline_data');
+                        if (cachedData) return JSON.parse(cachedData);
+                    } catch (e) {}
+                    return { keluarga: [], anak: [], pengurus: [], pengumuman: [], arsipAnak: [], arsip: [], riwayatAmplop: [], prestasi: [] };
+                });
+                // 🆕 DATA GLOBAL (semua wilayah, TANPA filter) -- KHUSUS buat tab
+                // Beranda (dashboardStats & analytics GOPAY/SAPA), supaya semua role
+                // lihat angka SE-INDONESIA di Beranda, terlepas dari wilayahAkses-nya.
             // Tab lain (Data Anak/Keluarga dst) TETAP pakai `data` yang difilter
             // server-side per wilayah seperti biasa -- JANGAN pakai dataGlobal di
             // tab manapun selain Beranda, biar kerahasiaan data wilayah lain
