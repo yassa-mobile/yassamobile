@@ -1143,7 +1143,13 @@ const refresh = useCallback(async () => {
                 setLoading(kalimatAcakMobile(KALIMAT_OVERLAY_DATA_MOBILE));
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
-                    const resBundle = await postApi({ action: 'readBundle', token: tkn });
+                    
+                    // Pisahkan pemanggilan readBundle dan readDashboardGlobal
+                    // untuk mencegah timeout dan error JSON di frontend (khususnya untuk Super Admin)
+                    const [resBundle, resGlobal] = await Promise.all([
+                        postApi({ action: 'readBundle', token: tkn }),
+                        postApi({ action: 'readDashboardGlobal', token: tkn }).catch(() => ({success: true, data: { keluarga: [], anak: [], arsipAnak: [] }}))
+                    ]);
 
                     if (resBundle && resBundle.success) {
                         const b = resBundle.data || {};
@@ -1157,15 +1163,22 @@ const refresh = useCallback(async () => {
                             riwayatAmplop: b.riwayatAmplop || [],
                             prestasi: b.prestasi || []
                         });
-                        setDataGlobal({
-                            keluarga: b.global?.keluarga || [],
-                            anak: b.global?.anak || [],
-                            arsipAnak: b.global?.arsipAnak || []
-                        });
+                        
+                        if (resGlobal && resGlobal.success) {
+                            setDataGlobal({
+                                keluarga: resGlobal.data.keluarga || [],
+                                anak: resGlobal.data.anak || [],
+                                arsipAnak: resGlobal.data.arsipAnak || []
+                            });
+                        }
+                    } else if (resBundle && resBundle.error && resBundle.error.includes("terblokir")) {
+                        // Tambahkan pesan error jika timeout atau putus koneksi saat readBundle
+                        setMsg("⚠️ Gagal memuat data: Waktu tunggu habis (Timeout) atau koneksi terputus. Silakan coba lagi.");
+                        setTimeout(() => setMsg(""), 5000);
                     } else {
                         // 🔁 FALLBACK: deployment backend belum punya action 'readBundle'
                         // (misal belum di-update) -- pakai cara lama sebagai jaring pengaman.
-                        const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi, resGlobal] = await Promise.all([
+                        const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi] = await Promise.all([
                             postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
                             postApi({ action: 'read', sheet: 'Anak', token: tkn }),
                             postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
@@ -1173,19 +1186,24 @@ const refresh = useCallback(async () => {
                             postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
                             postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
                             postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'readDashboardGlobal', token: tkn }).catch(() => ({success: true, data: { keluarga: [], anak: [], arsipAnak: [] }}))
+                            postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []}))
                         ]);
 
                         if (resK.success && resA.success) {
                             setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] });
+                        } else {
+                            // Tambahkan pesan error jika fallback juga gagal
+                            setMsg("⚠️ Gagal memuat data secara menyeluruh. Silakan muat ulang halaman.");
+                            setTimeout(() => setMsg(""), 5000);
                         }
+                        
                         if (resGlobal && resGlobal.success) {
                             setDataGlobal({ keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] });
                         }
                     }
                 } catch (e) { 
-                    setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
+                    setMsg("⚠️ Koneksi Gagal. Pastikan sinyal stabil dan muat ulang halaman.");
+                    setTimeout(() => setMsg(""), 5000);
                 }
                 setLoading(false);
             }, [role]);
