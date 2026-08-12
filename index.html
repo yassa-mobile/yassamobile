@@ -1119,6 +1119,8 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             const [activeHomeTab, setActiveHomeTab] = useState('total'); // 🆕 STATE TAB BERANDA GAYA TELKOMSEL
             const [data, setData] = useState(() => {
                 try {
+                    const [data, setData] = useState(() => {
+                try {
                     const cachedData = localStorage.getItem('yassa_offline_data');
                     if (cachedData) return JSON.parse(cachedData);
                 } catch (e) {}
@@ -1143,120 +1145,146 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             // STATE BUKA/TUTUP KARTU ARSIP DOKUMEN (per ID_Keluarga) di Katalog Anak
             const [expandedArsipCard, setExpandedArsipCard] = useState({});
 
-// FUNGSI REFRESH (⚡ DIOPTIMASI: 1x request 'readBundle', bukan 9 request paralel)
-// Sebelumnya refresh() nembak 9 request POST terpisah ke GAS secara paralel --
-// tiap request punya overhead startup sendiri-sendiri di server, jadi totalnya
-// numpuk dan loading bisa 1 menit lebih. Sekarang cukup 1x request ke action
-// 'readBundle' yang membaca semua sheet itu dalam SATU eksekusi backend.
-// Kalau readBundle gagal total (mis. deployment lama belum ter-update), ada
-// fallback otomatis balik ke cara lama (9 request) supaya app tetap jalan.
+// FUNGSI REFRESH (⚡ DIOPTIMASI: OFFLINE CACHE + SEQUENTIAL FETCH)
+// Mencegah masalah "Data Kosong" di Yassa Hub.
+// Jika cache tersedia, UI langsung tampil dan data di-refresh di background.
+// Jika cache belum ada, sistem akan menunggu 'readBundle' dan 'readDashboardGlobal'
+// secara berurutan agar terhindar dari Timeout Iframe.
 const refresh = useCallback(async () => {
-                if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
-                
-                // 🌟 CEK CACHE LOKAL: Jika data offline sudah ada di HP, JANGAN tampilkan layar loading biru penuh!
-                // Aplikasi akan langsung terbuka, sementara data tetap direfresh di latar belakang.
-                const isOfflineCacheAvailable = !!localStorage.getItem('yassa_offline_data');
-                if (!isOfflineCacheAvailable) {
-                    setLoading(kalimatAcakMobile(KALIMAT_OVERLAY_DATA_MOBILE));
-                }
+    if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
+    
+    // 🌟 CEK CACHE: Apakah memori lokal sudah menyimpan data?
+    const isOfflineCacheAvailable = !!localStorage.getItem('yassa_offline_data') && !!localStorage.getItem('yassa_offline_global');
+    
+    if (!isOfflineCacheAvailable) {
+        setLoading("Menyiapkan Data Wilayah...");
+    }
 
+    try {
+        const tkn = yassaStore.get('yassa-token') || '';
+        
+        // 1. Tarik Data Utama (Bundle)
+        const resBundle = await postApi({ action: 'readBundle', token: tkn });
+
+        if (resBundle && resBundle.success) {
+            const b = resBundle.data || {};
+            const freshData = {
+                keluarga: b.keluarga || [],
+                anak: b.anak || [],
+                pengurus: b.pengurus || [],
+                pengumuman: b.pengumuman || [],
+                arsipAnak: b.arsipAnak || [],
+                arsip: b.arsip || [],
+                riwayatAmplop: b.riwayatAmplop || [],
+                prestasi: b.prestasi || []
+            };
+            
+            setData(freshData);
+            try { localStorage.setItem('yassa_offline_data', JSON.stringify(freshData)); } catch(e) {}
+            
+            // Jika ini pertama kali (belum ada cache), beri tahu pengguna sedang proses tahap 2
+            if (!isOfflineCacheAvailable) {
+                setLoading("Menyinkronkan Data Nasional...");
+            }
+
+            // 2. Tarik Data Global (Background jika ada Cache, Berurutan jika tidak ada Cache)
+            if (!isOfflineCacheAvailable) {
                 try {
-                    const tkn = yassaStore.get('yassa-token') || '';
-                    
-                    // 1. Tarik Data Utama (Bundle) secara independen
-                    const resBundle = await postApi({ action: 'readBundle', token: tkn });
-
-                    if (resBundle && resBundle.success) {
-                        const b = resBundle.data || {};
-                        const freshData = {
-                            keluarga: b.keluarga || [],
-                            anak: b.anak || [],
-                            pengurus: b.pengurus || [],
-                            pengumuman: b.pengumuman || [],
-                            arsipAnak: b.arsipAnak || [],
-                            arsip: b.arsip || [],
-                            riwayatAmplop: b.riwayatAmplop || [],
-                            prestasi: b.prestasi || []
+                    const resGlobal = await postApi({ action: 'readDashboardGlobal', token: tkn });
+                    if (resGlobal && resGlobal.success) {
+                        const freshGlobal = {
+                            keluarga: resGlobal.data.keluarga || [],
+                            anak: resGlobal.data.anak || [],
+                            arsipAnak: resGlobal.data.arsipAnak || []
                         };
-                        
-                        // Perbarui tampilan dengan data terbaru dari server
-                        setData(freshData);
-                        
-                        // 💾 SIMPAN KE MEMORI HP (Offline Cache)
-                        try { localStorage.setItem('yassa_offline_data', JSON.stringify(freshData)); } catch(e) {}
-                        
-                        // Matikan layar loading (jika tadi sempat menyala)
-                        if (!isOfflineCacheAvailable) setLoading(false);
-
-                        // 2. Tarik Data Global di BACKGROUND secara diam-diam (Mencegah Timeout iframe Hub)
-                        postApi({ action: 'readDashboardGlobal', token: tkn })
-                            .then(resGlobal => {
-                                if (resGlobal && resGlobal.success) {
-                                    const freshGlobal = {
-                                        keluarga: resGlobal.data.keluarga || [],
-                                        anak: resGlobal.data.anak || [],
-                                        arsipAnak: resGlobal.data.arsipAnak || []
-                                    };
-                                    setDataGlobal(freshGlobal);
-                                    
-                                    // 💾 SIMPAN CACHE GLOBAL KE HP
-                                    try { localStorage.setItem('yassa_offline_global', JSON.stringify(freshGlobal)); } catch(e) {}
-                                }
-                            })
-                            .catch(err => console.log("Gagal memuat data global di background:", err));
-
-                    } else if (resBundle && resBundle.error && resBundle.error.includes("terblokir")) {
-                        if (!isOfflineCacheAvailable) {
-                            setMsg("⚠️ Gagal memuat data: Waktu tunggu habis. Silakan coba lagi.");
-                            setTimeout(() => setMsg(""), 5000);
-                        }
-                        if (!isOfflineCacheAvailable) setLoading(false);
-                    } else {
-                        // 🔁 FALLBACK: Jika backend lama tidak mendukung readBundle
-                        const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi] = await Promise.all([
-                            postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
-                            postApi({ action: 'read', sheet: 'Anak', token: tkn }),
-                            postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []})),
-                            postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []}))
-                        ]);
-
-                        if (resK.success && resA.success) {
-                            const fallbackData = { keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] };
-                            setData(fallbackData);
-                            try { localStorage.setItem('yassa_offline_data', JSON.stringify(fallbackData)); } catch(e) {}
-                            
-                            if (!isOfflineCacheAvailable) setLoading(false);
-
-                            postApi({ action: 'readDashboardGlobal', token: tkn })
-                                .then(resGlobal => {
-                                    if (resGlobal && resGlobal.success) {
-                                        const fallbackGlobal = { keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] };
-                                        setDataGlobal(fallbackGlobal);
-                                        try { localStorage.setItem('yassa_offline_global', JSON.stringify(fallbackGlobal)); } catch(e) {}
-                                    }
-                                })
-                                .catch(err => console.log("Gagal memuat data global fallback:", err));
-
-                        } else {
-                            if (!isOfflineCacheAvailable) {
-                                setMsg("⚠️ Gagal memuat data. Silakan muat ulang halaman.");
-                                setTimeout(() => setMsg(""), 5000);
-                            }
-                            if (!isOfflineCacheAvailable) setLoading(false);
-                        }
+                        setDataGlobal(freshGlobal);
+                        try { localStorage.setItem('yassa_offline_global', JSON.stringify(freshGlobal)); } catch(e) {}
                     }
-                } catch (e) { 
-                    if (!isOfflineCacheAvailable) {
-                        setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
-                        setTimeout(() => setMsg(""), 5000);
-                    }
-                    if (!isOfflineCacheAvailable) setLoading(false);
+                } catch (e) {
+                    console.log("Gagal memuat data global:", e);
                 }
-            }, [role]);
+                // Selesai semua tahap, baru matikan loading
+                setLoading(false);
+            } else {
+                // Background fetch berjalan diam-diam
+                postApi({ action: 'readDashboardGlobal', token: tkn })
+                    .then(resGlobal => {
+                        if (resGlobal && resGlobal.success) {
+                            const freshGlobal = {
+                                keluarga: resGlobal.data.keluarga || [],
+                                anak: resGlobal.data.anak || [],
+                                arsipAnak: resGlobal.data.arsipAnak || []
+                            };
+                            setDataGlobal(freshGlobal);
+                            try { localStorage.setItem('yassa_offline_global', JSON.stringify(freshGlobal)); } catch(e) {}
+                        }
+                    })
+                    .catch(err => console.log("Gagal memuat data global di background:", err));
+            }
+
+        } else if (resBundle && resBundle.error && resBundle.error.includes("terblokir")) {
+            if (!isOfflineCacheAvailable) {
+                setMsg("⚠️ Gagal memuat data: Waktu tunggu habis. Silakan coba lagi.");
+                setTimeout(() => setMsg(""), 5000);
+                setLoading(false);
+            }
+        } else {
+            // 🔁 FALLBACK PENGAMAN: Jika action 'readBundle' tidak didukung backend
+            if (!isOfflineCacheAvailable) setLoading("Mengambil Data Satu per Satu...");
+            const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi] = await Promise.all([
+                postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
+                postApi({ action: 'read', sheet: 'Anak', token: tkn }),
+                postApi({ action: 'read', sheet: 'PENGURUS YASSA', token: tkn }).catch(() => ({success: true, data: []})),
+                postApi({ action: 'read', sheet: 'Pengumuman', token: tkn }).catch(() => ({success: true, data: []})),
+                postApi({ action: 'read', sheet: 'Arsip_Anak', token: tkn }).catch(() => ({success: true, data: []})),
+                postApi({ action: 'read', sheet: 'Manajemen_Arsip', token: tkn }).catch(() => ({success: true, data: []})),
+                postApi({ action: 'read', sheet: 'Riwayat_Pemilihan_Santunan', token: tkn }).catch(() => ({success: true, data: []})),
+                postApi({ action: 'read', sheet: 'Prestasi_Anak', token: tkn }).catch(() => ({success: true, data: []}))
+            ]);
+
+            if (resK.success && resA.success) {
+                const fallbackData = { keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] };
+                setData(fallbackData);
+                try { localStorage.setItem('yassa_offline_data', JSON.stringify(fallbackData)); } catch(e) {}
+                
+                if (!isOfflineCacheAvailable) {
+                    try {
+                        const resGlobal = await postApi({ action: 'readDashboardGlobal', token: tkn });
+                        if (resGlobal && resGlobal.success) {
+                            const fallbackGlobal = { keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] };
+                            setDataGlobal(fallbackGlobal);
+                            try { localStorage.setItem('yassa_offline_global', JSON.stringify(fallbackGlobal)); } catch(e) {}
+                        }
+                    } catch (e) {}
+                    setLoading(false);
+                } else {
+                    postApi({ action: 'readDashboardGlobal', token: tkn })
+                        .then(resGlobal => {
+                            if (resGlobal && resGlobal.success) {
+                                const fallbackGlobal = { keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] };
+                                setDataGlobal(fallbackGlobal);
+                                try { localStorage.setItem('yassa_offline_global', JSON.stringify(fallbackGlobal)); } catch(e) {}
+                            }
+                        })
+                        .catch(err => console.log("Gagal memuat data global fallback:", err));
+                }
+
+            } else {
+                if (!isOfflineCacheAvailable) {
+                    setMsg("⚠️ Gagal memuat data secara menyeluruh. Silakan muat ulang halaman.");
+                    setTimeout(() => setMsg(""), 5000);
+                    setLoading(false);
+                }
+            }
+        }
+    } catch (e) { 
+        if (!isOfflineCacheAvailable) {
+            setMsg("⚠️ Koneksi Gagal. Pastikan URL Web App benar."); 
+            setTimeout(() => setMsg(""), 5000);
+            setLoading(false);
+        }
+    }
+}, [role]);
 // =================================================================
 // 🆕 FUNGSI KALKULASI DATA MASUK & KELUAR (SUPER STRICT FILTER)
 // =================================================================
