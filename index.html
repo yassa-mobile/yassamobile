@@ -1471,7 +1471,13 @@ const submitArchiveChildren = async () => {
         // Reset tampilan
         setArchiveModal({ open: false, selectedChildren: [], reason: 'BUNDA MENIKAH KEMBALI', manualReason: '' });
         setRegModal({ open: false, step: 1, mode: 'add' });
-        refresh(); // Muat ulang data terbaru (Keluarga yang tidak punya anak otomatis hilang)
+        // FIX: WAJIB di-await -- sebelumnya refresh() dipanggil tanpa menunggu,
+        // sehingga setLoading(false) di bawah langsung jalan duluan dan layar
+        // sempat menampilkan data CACHE LAMA (nama yang baru diarsipkan masih
+        // kelihatan sesaat) sebelum akhirnya hilang begitu refresh() selesai
+        // di belakang layar. Dengan await, loading baru ditutup SETELAH data
+        // terbaru dari server benar-benar sudah masuk ke state.
+        await refresh(); // Muat ulang data terbaru (Keluarga yang tidak punya anak otomatis hilang)
     } catch (e) {
         setMsg("❌ Terjadi kesalahan jaringan saat mengarsipkan.");
     }
@@ -3303,7 +3309,9 @@ const submitArchiveChildren = async () => {
                     };
                     const resKeluarga = await (isUpdateKeluarga ? postApiUpdate : postApi)(payloadKeluarga);
                     if (!resKeluarga.success) {
-                        if (resKeluarga.isCancelledConflict) refresh();
+                        // FIX: di-await agar state data sudah pasti ter-update sebelum
+                        // pesan error ditampilkan ke admin (hindari tampilan data basi).
+                        if (resKeluarga.isCancelledConflict) await refresh();
                         throw new Error(resKeluarga.error);
                     }
 
@@ -3349,11 +3357,13 @@ const submitArchiveChildren = async () => {
                         }
                     }
                     
-                    if (adaKonflikAnakDibatalkan) refresh();
+                    // FIX: kedua refresh() di bawah juga di-await -- dulu tidak ditunggu,
+                    // jadi ada celah singkat pesan error/berhasil tampil bareng data lama.
+                    if (adaKonflikAnakDibatalkan) await refresh();
                     if (anakGagal.length > 0) {
                         // Data Keluarga (dan mungkin sebagian Anak) sudah tersimpan -- refresh dulu
                         // supaya admin lihat state terbaru sebelum mencoba ulang yang gagal.
-                        refresh();
+                        await refresh();
                         throw new Error(`Keluarga tersimpan, tapi ${anakGagal.length} data anak GAGAL disimpan (${anakGagal[0].nama}: ${anakGagal[0].error})`);
                     }
 
@@ -3363,7 +3373,11 @@ const submitArchiveChildren = async () => {
                     // Tambah/Ubah data otomatis masuk ke Log Perubahan Data dari sisi server.
 
                     setRegModal({ open: false, step: 1, mode: 'add' });
-                    refresh(); 
+                    // FIX: WAJIB di-await -- sebelumnya setLoading(false) di bawah
+                    // langsung jalan sebelum refresh() selesai, sehingga modal
+                    // tertutup menampilkan data CACHE LAMA sesaat sebelum data
+                    // terbaru dari server benar-benar masuk ke state.
+                    await refresh();
                 } catch (error) {
                     setErrorMsg("❌ Terjadi kesalahan: " + error.message);
                 }
