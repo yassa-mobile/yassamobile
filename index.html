@@ -1144,12 +1144,8 @@ const refresh = useCallback(async () => {
                 try {
                     const tkn = yassaStore.get('yassa-token') || '';
                     
-                    // Pisahkan pemanggilan readBundle dan readDashboardGlobal
-                    // untuk mencegah timeout dan error JSON di frontend (khususnya untuk Super Admin)
-                    const [resBundle, resGlobal] = await Promise.all([
-                        postApi({ action: 'readBundle', token: tkn }),
-                        postApi({ action: 'readDashboardGlobal', token: tkn }).catch(() => ({success: true, data: { keluarga: [], anak: [], arsipAnak: [] }}))
-                    ]);
+                    // 1. Ambil data utama (Bundle) secara independen dan tunggu sampai selesai
+                    const resBundle = await postApi({ action: 'readBundle', token: tkn });
 
                     if (resBundle && resBundle.success) {
                         const b = resBundle.data || {};
@@ -1164,20 +1160,30 @@ const refresh = useCallback(async () => {
                             prestasi: b.prestasi || []
                         });
                         
-                        if (resGlobal && resGlobal.success) {
-                            setDataGlobal({
-                                keluarga: resGlobal.data.keluarga || [],
-                                anak: resGlobal.data.anak || [],
-                                arsipAnak: resGlobal.data.arsipAnak || []
-                            });
-                        }
+                        // 🌟 UI UNBLOCKER: Matikan layar loading SEGERA setelah data inti masuk. 
+                        // Superadmin bisa langsung klik "Data KK" tanpa harus menunggu data dashboard global.
+                        setLoading(false);
+
+                        // 2. Tarik data Global di BACKGROUND secara diam-diam.
+                        // Ini mencegah browser mencekik request bersamaan di dalam iframe (YASSA Hub).
+                        postApi({ action: 'readDashboardGlobal', token: tkn })
+                            .then(resGlobal => {
+                                if (resGlobal && resGlobal.success) {
+                                    setDataGlobal({
+                                        keluarga: resGlobal.data.keluarga || [],
+                                        anak: resGlobal.data.anak || [],
+                                        arsipAnak: resGlobal.data.arsipAnak || []
+                                    });
+                                }
+                            })
+                            .catch((err) => console.log("Gagal memuat data global di background:", err));
+                            
                     } else if (resBundle && resBundle.error && resBundle.error.includes("terblokir")) {
-                        // Tambahkan pesan error jika timeout atau putus koneksi saat readBundle
                         setMsg("⚠️ Gagal memuat data: Waktu tunggu habis (Timeout) atau koneksi terputus. Silakan coba lagi.");
                         setTimeout(() => setMsg(""), 5000);
+                        setLoading(false);
                     } else {
                         // 🔁 FALLBACK: deployment backend belum punya action 'readBundle'
-                        // (misal belum di-update) -- pakai cara lama sebagai jaring pengaman.
                         const [resK, resA, resP, resInfo, resArsip, resArsipDok, resRiwayatAmplop, resPrestasi] = await Promise.all([
                             postApi({ action: 'read', sheet: 'Keluarga', token: tkn }),
                             postApi({ action: 'read', sheet: 'Anak', token: tkn }),
@@ -1191,21 +1197,29 @@ const refresh = useCallback(async () => {
 
                         if (resK.success && resA.success) {
                             setData({ keluarga: resK.data, anak: resA.data, pengurus: resP.data || [], pengumuman: resInfo?.data || [], arsipAnak: resArsip?.data || [], arsip: resArsipDok?.data || [], riwayatAmplop: resRiwayatAmplop?.data || [], prestasi: resPrestasi?.data || [] });
+                            
+                            // Matikan loading segera
+                            setLoading(false);
+
+                            // Background fetch untuk global di mode fallback
+                            postApi({ action: 'readDashboardGlobal', token: tkn })
+                                .then(resGlobal => {
+                                    if (resGlobal && resGlobal.success) {
+                                        setDataGlobal({ keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] });
+                                    }
+                                })
+                                .catch((err) => console.log("Gagal memuat data global di background fallback:", err));
                         } else {
-                            // Tambahkan pesan error jika fallback juga gagal
                             setMsg("⚠️ Gagal memuat data secara menyeluruh. Silakan muat ulang halaman.");
                             setTimeout(() => setMsg(""), 5000);
-                        }
-                        
-                        if (resGlobal && resGlobal.success) {
-                            setDataGlobal({ keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] });
+                            setLoading(false);
                         }
                     }
                 } catch (e) { 
                     setMsg("⚠️ Koneksi Gagal. Pastikan sinyal stabil dan muat ulang halaman.");
                     setTimeout(() => setMsg(""), 5000);
+                    setLoading(false);
                 }
-                setLoading(false);
             }, [role]);
 // =================================================================
 // 🆕 FUNGSI KALKULASI DATA MASUK & KELUAR (SUPER STRICT FILTER)
