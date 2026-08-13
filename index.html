@@ -778,6 +778,22 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
             "Sedang menjumlahkan kebaikan...",
             "Semangat, sedikit lagi...",
         ];
+        // ============================================================
+        // 🆕 KALIMAT MOTIVASI buat layar "masuk otomatis dari Hub" —
+        // dipakai selama proses SSO berlangsung (kadang lebih lama di
+        // jaringan operator yang lambat). Diganti-ganti tiap beberapa
+        // detik biar nunggunya kerasa lebih ringan, bukan diem doang.
+        // ============================================================
+        const KALIMAT_MOTIVASI_TUNGGU_MOBILE = [
+            "Sedikit sabar, insyaAllah berbuah manis...",
+            "Setiap detik menunggu ini, insyaAllah jadi ladang pahala...",
+            "Yang baik memang kadang butuh proses...",
+            "Anak-anak yatim kita sabar menunggu bantuan, kita juga bisa sabar sebentar...",
+            "Jaringan boleh lambat, niat baik jangan surut...",
+            "Sabar itu separuh dari iman, sedikit lagi kok...",
+            "Sedang menghubungkan hati yang peduli dengan data yang menunggu...",
+            "Hal baik butuh waktu — sebentar lagi selesai...",
+        ];
         function kalimatAcakMobile(daftar) {
             return daftar[Math.floor(Math.random() * daftar.length)];
         }
@@ -812,6 +828,38 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 localStorage.setItem('yassa-mobile-admin-bypass', 'true');
                 setAdminBypass(true);
             };
+
+            // ============================================================
+            // 🩹 FIX (race condition splash vs SSO): dulu splash cuma nunggu
+            // timer statis 2.5 detik, TIDAK nunggu proses SSO (postApi
+            // ssoLogin ke server) yang durasinya gak pasti -- kalau server
+            // lebih lambat dari 2.5 detik (mis. GAS "cold start" / jaringan
+            // lambat), begitu splash ilang tapi role belum ke-set, kode
+            // langsung jatuh ke form login manual (lihat gate "!role" di
+            // render) padahal SSO-nya masih diproses di background. User
+            // jadi lihat menu login sebentar walau harusnya auto-login.
+            // ssoProcessing dipakai buat NAHAN render form login selama
+            // tiket SSO dari URL masih diproses (baru false setelah proses
+            // itu beneran kelar, sukses ATAU gagal -- lihat useEffect SSO
+            // di bawah & gate render di bagian JSX).
+            // ============================================================
+            const [ssoProcessing, setSsoProcessing] = useState(!!ssoTokenFromUrl);
+
+            // ============================================================
+            // 🆕 Teks motivasi yang bergilir selama layar "masuk otomatis
+            // dari Hub" tampil (ssoProcessing masih true). Ganti kalimat
+            // tiap 2.8 detik biar nunggu di jaringan lambat gak berasa
+            // diem/macet -- interval otomatis berhenti begitu ssoProcessing
+            // jadi false (auto-login kelar), jadi gak nyala sia-sia.
+            // ============================================================
+            const [teksTungguSso, setTeksTungguSso] = useState(() => kalimatAcakMobile(KALIMAT_MOTIVASI_TUNGGU_MOBILE));
+            useEffect(() => {
+                if (!ssoProcessing) return;
+                const interval = setInterval(() => {
+                    setTeksTungguSso(kalimatAcakMobile(KALIMAT_MOTIVASI_TUNGGU_MOBILE));
+                }, 2800);
+                return () => clearInterval(interval);
+            }, [ssoProcessing]);
 
             // ============================================================
             // 🔗 SSO AUTO-LOGIN — dipicu kalau ada ?sso=... di URL (dibuka
@@ -902,7 +950,13 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                     try {
                         window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
                     } catch (e) {}
-                    if (!batal) setLoading(false);
+                    if (!batal) {
+                        setLoading(false);
+                        // 🩹 FIX: baru boleh buka gerbang ke form login manual
+                        // SETELAH proses SSO ini beneran kelar (sukses set role,
+                        // atau gagal/basi -- lihat komentar ssoProcessing di atas).
+                        setSsoProcessing(false);
+                    }
                 })();
 
                 return () => { batal = true; };
@@ -3435,6 +3489,32 @@ const submitArchiveChildren = async () => {
                         >
                             Lanjut ke Yassa Mobile (Admin)
                         </button>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // 🩹 FIX: dulu gak ada gate ini -- begitu splash 2.5 detik abis
+            // tapi tiket SSO dari Hub masih diproses (role belum ke-set),
+            // kode langsung tembus ke form login manual di bawah, padahal
+            // sebentar lagi auto-login-nya kelar sendiri. Sekarang selama
+            // ssoProcessing masih true (ada ?sso=... dari Hub & belum
+            // selesai diproses), tetap tampilkan layar "masuk otomatis",
+            // BUKAN form login -- form login manual cuma tampil kalau
+            // SSO-nya udah beneran gagal/basi (ssoProcessing jadi false).
+            // ============================================================
+            if (!role && ssoProcessing) {
+                return (
+                    <div className="fixed inset-0 bg-[#0B0F19] flex flex-col items-center justify-center z-[9999]">
+                        <div className="flex items-center gap-1 mb-8">
+                            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white drop-shadow-lg">
+                                YASSA<span className="text-[#16a34a]">Mobile</span>
+                            </h1>
+                        </div>
+                        <div className="w-48 sm:w-56 h-1.5 bg-slate-800 rounded-full overflow-hidden mb-6 relative">
+                            <div className="absolute top-0 left-0 h-full w-1/2 bg-gradient-to-r from-emerald-400 via-green-500 to-emerald-600 rounded-full anim-loading-bar shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                        </div>
+                        <p className="text-slate-400 text-[11px] font-medium tracking-wide text-center px-8 max-w-xs fade-in" key={teksTungguSso}>{teksTungguSso}</p>
                     </div>
                 );
             }
