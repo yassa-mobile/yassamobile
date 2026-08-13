@@ -1292,6 +1292,16 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                     if (!e.data || e.data.type !== 'YASSA_HUB_NAVIGATE') return;
                     const validTabs = ['home', 'keluarga', 'perisai', 'anak', 'aksi'];
                     if (validTabs.includes(e.data.tab)) setTab(e.data.tab);
+                    // 🆕 Balas ACK ke Hub begitu pesan ini diproses -- ini yang dipakai
+                    // Hub buat mastiin app di iframe ini BENERAN masih hidup (bukan
+                    // udah crash/mati kehabisan memori). Kalau Hub gak dapet balasan
+                    // ini dalam waktu singkat, Hub bakal reload ulang app ini dari nol
+                    // otomatis, jadi user gak macet selamanya di layar crash.
+                    try {
+                        if (e.data.nonce && e.source) {
+                            e.source.postMessage({ type: 'YASSA_HUB_NAV_ACK', nonce: e.data.nonce }, e.origin);
+                        }
+                    } catch (err) {}
                 }
                 window.addEventListener('message', handleHubNavigate);
                 return () => window.removeEventListener('message', handleHubNavigate);
@@ -1319,6 +1329,22 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 } catch (e) {}
                 return { keluarga: [], anak: [], arsipAnak: [] };
             });
+            // 🆕 HEMAT MEMORI: untuk role admin/pengurus, backend TIDAK memfilter
+            // wilayah sama sekali (lihat filterDataByWilayah_ di Code.gs), jadi
+            // `data` (dari readBundle) sudah pasti identik isinya dengan apa yang
+            // akan didapat dari 'readDashboardGlobal'. Supaya gak nyimpen 2 salinan
+            // penuh keluarga/anak/arsipAnak di memori + localStorage, role ini
+            // cukup pakai `data` sebagai sumber "global"-nya (alias, bukan copy
+            // baru). Untuk role korwil, wilayah mereka DIBATASI di `data`, jadi
+            // tetap butuh `dataGlobal` yang benar-benar terpisah (tanpa filter)
+            // supaya tab Beranda tetap nasional -- perilaku ini TIDAK berubah.
+            const isUnrestrictedAccess = (role === 'admin' || role === 'pengurus');
+            const effectiveGlobal = useMemo(() => {
+                if (isUnrestrictedAccess) {
+                    return { keluarga: data.keluarga || [], anak: data.anak || [], arsipAnak: data.arsipAnak || [] };
+                }
+                return dataGlobal;
+            }, [isUnrestrictedAccess, data, dataGlobal]);
             const [loading, setLoading] = useState(false);
             const [msg, setMsg] = useState('');
             // STATE BUKA/TUTUP KARTU ARSIP DOKUMEN (per ID_Keluarga) di Katalog Anak
@@ -1333,7 +1359,12 @@ const refresh = useCallback(async () => {
     if (!role || URL_DATABASE_PERMANEN.includes("MASUKKAN_LINK")) return;
     
     // 🌟 CEK CACHE: Apakah memori lokal sudah menyimpan data?
-    const isOfflineCacheAvailable = !!localStorage.getItem('yassa_offline_data') && !!localStorage.getItem('yassa_offline_global');
+    // 🆕 Admin/pengurus gak pernah nulis 'yassa_offline_global' lagi (lihat
+    // isUnrestrictedAccess di atas), jadi cache-nya cukup dicek dari
+    // 'yassa_offline_data' saja.
+    const isOfflineCacheAvailable = isUnrestrictedAccess
+        ? !!localStorage.getItem('yassa_offline_data')
+        : (!!localStorage.getItem('yassa_offline_data') && !!localStorage.getItem('yassa_offline_global'));
     
     if (!isOfflineCacheAvailable) {
         setLoading("Menyiapkan Data Wilayah...");
@@ -1361,6 +1392,14 @@ const refresh = useCallback(async () => {
             setData(freshData);
             try { localStorage.setItem('yassa_offline_data', JSON.stringify(freshData)); } catch(e) {}
             
+            // 🆕 Admin/Pengurus: `data` sudah tanpa-filter (lihat isUnrestrictedAccess
+            // di atas), jadi 'readDashboardGlobal' TIDAK PERLU dipanggil sama sekali --
+            // hemat 1 API call + hindari nyimpen salinan dobel keluarga/anak/arsipAnak.
+            if (isUnrestrictedAccess) {
+                try { localStorage.removeItem('yassa_offline_global'); } catch(e) {}
+                setLoading(false);
+            } else {
+
             // Jika ini pertama kali (belum ada cache), beri tahu pengguna sedang proses tahap 2
             if (!isOfflineCacheAvailable) {
                 setLoading("Menyinkronkan Data Nasional...");
@@ -1401,6 +1440,8 @@ const refresh = useCallback(async () => {
                     .catch(err => console.log("Gagal memuat data global di background:", err));
             }
 
+            } // end else (!isUnrestrictedAccess)
+
         } else if (resBundle && resBundle.error && resBundle.error.includes("terblokir")) {
             if (!isOfflineCacheAvailable) {
                 setMsg("⚠️ Gagal memuat data: Waktu tunggu habis. Silakan coba lagi.");
@@ -1426,7 +1467,12 @@ const refresh = useCallback(async () => {
                 setData(fallbackData);
                 try { localStorage.setItem('yassa_offline_data', JSON.stringify(fallbackData)); } catch(e) {}
                 
-                if (!isOfflineCacheAvailable) {
+                if (isUnrestrictedAccess) {
+                    // Sama seperti jalur utama di atas: admin/pengurus gak perlu
+                    // 'readDashboardGlobal' karena `data` sudah tanpa-filter.
+                    try { localStorage.removeItem('yassa_offline_global'); } catch(e) {}
+                    setLoading(false);
+                } else if (!isOfflineCacheAvailable) {
                     try {
                         const resGlobal = await postApiWithRetry({ action: 'readDashboardGlobal', token: tkn });
                         if (resGlobal && resGlobal.success) {
@@ -1480,10 +1526,10 @@ const dashboardStats = useMemo(() => {
     let currentMonthKeluarList = [];
 
     // 🆕 PETA KELUARGA LOKAL (untuk ambil WILAYAH & NAMA ALM tiap anak via ID_Keluarga)
-    // 📊 Pakai dataGlobal (semua wilayah, tanpa filter) -- tab Beranda SENGAJA
-    // global untuk semua role, lihat catatan lengkap di useState dataGlobal.
+    // 📊 Pakai effectiveGlobal (semua wilayah, tanpa filter) -- tab Beranda SENGAJA
+    // global untuk semua role, lihat catatan lengkap di useState effectiveGlobal.
     const famMapLocal = {};
-    (dataGlobal.keluarga || []).forEach(f => {
+    (effectiveGlobal.keluarga || []).forEach(f => {
         const idK = String(getVal(f, 'ID_Keluarga') || '').trim().toUpperCase();
         if (idK) famMapLocal[idK] = f;
     });
@@ -1493,7 +1539,7 @@ const dashboardStats = useMemo(() => {
         const monthNum = String(index + 1).padStart(2, '0');
         const monthHtmlFormat = `${currentYear}-${monthNum}`; // Contoh: "2026-01"
         
-        const masukAnakArr = dataGlobal.anak.filter(c => {
+        const masukAnakArr = effectiveGlobal.anak.filter(c => {
             // HANYA CEK KOLOM INI, BUKAN SELURUH DATA ANAK
             const aktif = String(c['AKTIF SANTUNAN GOPAY'] || '').toUpperCase();
             if (!aktif) return false;
@@ -1503,7 +1549,7 @@ const dashboardStats = useMemo(() => {
         });
         const masuk = masukAnakArr.length;
 
-        const keluarAnakArr = (dataGlobal.arsipAnak || []).filter(c => {
+        const keluarAnakArr = (effectiveGlobal.arsipAnak || []).filter(c => {
             // HANYA CEK KOLOM INI
             const tglKeluar = String(c['TANGGAL KELUAR'] || '').toUpperCase();
             if (!tglKeluar) return false;
@@ -1547,7 +1593,7 @@ const dashboardStats = useMemo(() => {
     });
 
     return { monthlyData, totalMasuk, totalKeluar, currentYear, currentMonthStr, currentMonthMasuk, currentMonthKeluar, currentMonthMasukList, currentMonthKeluarList };
-}, [dataGlobal.anak, dataGlobal.arsipAnak, dataGlobal.keluarga]);
+}, [effectiveGlobal.anak, effectiveGlobal.arsipAnak, effectiveGlobal.keluarga]);
 
 // 🆕 STATISTIK KHUSUS KARTU PROFIL: total Data Baru & Data Keluar TAHUN INI, dibatasi wilayah Korwil.
 // (dashboardStats di atas SENGAJA tetap global untuk tab Beranda / Statistik 12 Bulan)
@@ -2377,14 +2423,14 @@ const submitArchiveChildren = async () => {
             }, [data.keluarga]);
 
             // 🆕 Versi GLOBAL (semua wilayah) dari familyLookupMap, khusus dipakai
-            // oleh `analytics` di tab Beranda -- lihat catatan di useState dataGlobal.
+            // oleh `analytics` di tab Beranda -- lihat catatan di useState effectiveGlobal.
             const familyLookupMapGlobal = useMemo(() => {
                 const map = {};
-                (dataGlobal.keluarga || []).forEach(f => {
+                (effectiveGlobal.keluarga || []).forEach(f => {
                     map[norm(getVal(f, 'ID_Keluarga'))] = f;
                 });
                 return map;
-            }, [dataGlobal.keluarga]);
+            }, [effectiveGlobal.keluarga]);
 
             // INDEX ANAK PER KELUARGA (agar tidak looping ulang seluruh data.anak setiap kali cari 1 keluarga)
             const anakByKeluargaMap = useMemo(() => {
@@ -2909,15 +2955,15 @@ const submitArchiveChildren = async () => {
 
 
             // 📊 Khusus tab Beranda (Total Program / GOPAY / SAPA) -- SENGAJA pakai
-            // dataGlobal (semua wilayah, tanpa filter) supaya semua role lihat
-            // angka SE-INDONESIA, lihat catatan lengkap di useState dataGlobal.
+            // effectiveGlobal (semua wilayah, tanpa filter) supaya semua role lihat
+            // angka SE-INDONESIA, lihat catatan lengkap di useState effectiveGlobal.
             const analytics = useMemo(() => {
                 const gopayKKSet = new Set();
                 const sapaKKSet = new Set();
                 let gStats = { yt: 0, yp: 0, dsbAnak: 0, dsbIbu: 0 };
                 let sStats = { yt: 0, yp: 0, dsbAnak: 0, dsbIbu: 0 };
 
-                dataGlobal.anak.forEach(c => {
+                effectiveGlobal.anak.forEach(c => {
                     const famIdNorm = norm(getVal(c, 'ID_Keluarga'));
                     const prog = (getVal(c, 'PROGRAM') || '').toLowerCase();
                     const isSapa = prog.includes('sapa') || prog.includes('asuh') || prog.includes('ota');
@@ -2949,26 +2995,26 @@ const submitArchiveChildren = async () => {
                 });
 
                 return { 
-                    gopayAnak: dataGlobal.anak.filter(c => getVal(c, 'PROGRAM').toLowerCase().includes('gopay')).length, 
+                    gopayAnak: effectiveGlobal.anak.filter(c => getVal(c, 'PROGRAM').toLowerCase().includes('gopay')).length, 
                     gopayKK: gopayKKSet.size, gStats, 
-                    sapaAnak: dataGlobal.anak.filter(c => { const p = getVal(c, 'PROGRAM').toLowerCase(); return p.includes('sapa') || p.includes('asuh') || p.includes('ota'); }).length, 
+                    sapaAnak: effectiveGlobal.anak.filter(c => { const p = getVal(c, 'PROGRAM').toLowerCase(); return p.includes('sapa') || p.includes('asuh') || p.includes('ota'); }).length, 
                     sapaKK: sapaKKSet.size, sStats 
                 };
-            }, [dataGlobal, familyLookupMapGlobal]);
+            }, [effectiveGlobal, familyLookupMapGlobal]);
 
             const regionalData = useMemo(() => {
                 const map = {};
                 const activeKkSet = {}; 
 
                 if (!regionAnalysisFilter) {
-                    dataGlobal.keluarga.forEach(f => {
+                    effectiveGlobal.keluarga.forEach(f => {
                         const w = (getVal(f, 'WILAYAH') || 'Lainnya').trim().toUpperCase();
                         if(!map[w]) map[w] = { kk: 0, yt: 0, yp: 0, dsb: 0 };
                         map[w].kk++;
                     });
                 }
 
-                dataGlobal.anak.forEach(c => {
+                effectiveGlobal.anak.forEach(c => {
                     const prog = (getVal(c, 'PROGRAM') || '').toLowerCase();
                     const isSapa = prog.includes('sapa') || prog.includes('asuh') || prog.includes('ota');
                     const isGopay = prog.includes('gopay');
@@ -3006,7 +3052,7 @@ const submitArchiveChildren = async () => {
                         });
                     });
                 } else {
-                    dataGlobal.keluarga.forEach(f => {
+                    effectiveGlobal.keluarga.forEach(f => {
                         const w = (getVal(f, 'WILAYAH') || 'Lainnya').trim().toUpperCase();
                         if (String(getVal(f, 'KATAGORI ISTRI')).toLowerCase().includes('disabilitas')) {
                             if (map[w]) map[w].dsb++;
@@ -3018,7 +3064,7 @@ const submitArchiveChildren = async () => {
                     .map(([wilayah, d]) => ({ wilayah, ...d }))
                     .filter(w => !(w.wilayah.toUpperCase() === 'LAINNYA' && w.yt === 0 && w.yp === 0 && w.dsb === 0))
                     .sort((a, b) => b.kk - a.kk);
-            }, [dataGlobal, regionAnalysisFilter, familyLookupMapGlobal]);
+            }, [effectiveGlobal, regionAnalysisFilter, familyLookupMapGlobal]);
 
             const updateSearchResults = useMemo(() => {
                 const hasQuery = updateSearchQuery && updateSearchQuery.trim().length >= 2;
