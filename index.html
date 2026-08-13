@@ -305,9 +305,89 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
         .anim-loading-bar {
             animation: slideLoading 1.5s ease-in-out infinite;
         }
+
+        /* ============================================================
+           🩹 FIX (poin 3: indikator status jaringan) -- banner tipis di
+           ATAS layar, dikendalikan JS vanilla (BUKAN state React), biar
+           gak perlu ubah komponen App() sama sekali. z-index paling
+           tinggi di app ini (di atas splash 9999, modal, dst).
+           ============================================================ */
+        .network-status-banner {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100000;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 9px 16px; font-size: 12px; font-weight: 700;
+            text-align: center; transform: translateY(-100%);
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            font-family: 'Plus Jakarta Sans', 'Hanken Grotesk', sans-serif;
+        }
+        .network-status-banner.show { transform: translateY(0); }
+        .network-status-banner.offline { background: #DC2626; color: #fff; }
+        .network-status-banner.online { background: #16A34A; color: #fff; }
     </style>
 </head>
 <body class="overflow-hidden text-slate-800">
+    <!-- ============ BANNER STATUS JARINGAN (di luar tree React) ============ -->
+    <div id="networkStatusBanner" class="network-status-banner offline">
+        <span>📡</span>
+        <span id="networkStatusText">Koneksi internet terputus</span>
+    </div>
+    <script>
+        // ============================================================
+        // 🩹 FIX (poin 3: indikator status jaringan) -- sengaja pakai
+        // blok script vanilla TERPISAH dari komponen React App() di bawah,
+        // biar (1) jalan dari awal SEBELUM React sempat mount/render,
+        // dan (2) gak perlu nambah state/re-render ke komponen App()
+        // yang udah kompleks. navigator.onLine + event online/offline
+        // adalah API bawaan browser, gak butuh library apapun.
+        //
+        // CATATAN JUJUR: navigator.onLine cuma baca status adaptor
+        // jaringan device (ada sinyal/data aktif atau enggak), BUKAN
+        // jaminan internetnya beneran nyambung ke server YASSA (mis.
+        // WiFi nyala tanpa akses internet tetap kebaca "online"). Jadi
+        // banner ini pelengkap -- kegagalan request tetap ditangani
+        // terpisah oleh postApiWithRetry (lihat pesan error di layarnya
+        // masing-masing).
+        // ============================================================
+        (function () {
+            let onlineToastTimer = null;
+
+            function updateNetworkStatusBanner(isOnline) {
+                const banner = document.getElementById("networkStatusBanner");
+                const textEl = document.getElementById("networkStatusText");
+                if (!banner || !textEl) return;
+
+                if (onlineToastTimer) {
+                    clearTimeout(onlineToastTimer);
+                    onlineToastTimer = null;
+                }
+
+                if (!isOnline) {
+                    banner.classList.remove("online");
+                    banner.classList.add("offline", "show");
+                    textEl.textContent = "Koneksi internet terputus";
+                    return;
+                }
+
+                // Baru balik online: kalau banner "offline" lagi keliatan,
+                // ganti jadi "koneksi kembali" 2.5 detik dulu baru sembunyi.
+                if (banner.classList.contains("show")) {
+                    banner.classList.remove("offline");
+                    banner.classList.add("online");
+                    textEl.textContent = "Koneksi internet kembali tersambung";
+                    onlineToastTimer = setTimeout(function () {
+                        banner.classList.remove("show");
+                    }, 2500);
+                }
+            }
+
+            window.addEventListener("online", function () { updateNetworkStatusBanner(true); });
+            window.addEventListener("offline", function () { updateNetworkStatusBanner(false); });
+            // Cek status awal pas app baru dibuka (jaga-jaga kalau HP udah
+            // dalam keadaan offline SEBELUM app ini dimuat).
+            if (!navigator.onLine) updateNetworkStatusBanner(false);
+        })();
+    </script>
     <div id="root">
         <!-- TAMPILAN LOADING SEBELUM REACT AKTIF -->
         <!-- 🛡️ [FIX] Pakai CSS inline (bukan class Tailwind) supaya splash INI DIJAMIN
@@ -468,6 +548,53 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                 return await res.json();
             } catch (error) {
                 return { success: false, error: "Koneksi terblokir oleh Google atau jaringan terputus." };
+            }
+        };
+
+        // ============================================================
+        // 🩹 FIX (jaringan lemah/tidak stabil): postApi() biasa cuma
+        // sekali coba, tanpa timeout eksplisit -- di jaringan operator
+        // yang lambat, satu kali fetch() bisa gantung lama sebelum
+        // browser sendiri yang nyerah, atau gagal sekali doang dan
+        // pemanggilnya langsung dianggap error permanen (padahal cuma
+        // sesaat kurang stabil).
+        //
+        // postApiWithRetry nambahin: (1) TIMEOUT per percobaan lewat
+        // AbortController, (2) RETRY otomatis beberapa kali dengan jeda
+        // singkat sebelum bener-bener nyerah.
+        //
+        // PENTING -- CUMA dipakai buat aksi BACA DATA / yang aman diulang
+        // (ssoLogin, readBundle, readDashboardGlobal, dst). JANGAN dipakai
+        // buat aksi TULIS DATA (add/update/delete/dsb) -- kalau request
+        // pertama sebenarnya sukses di server tapi responsnya yang
+        // hilang/telat, retry otomatis bisa bikin data KEDUPLIKAT/ke-apply
+        // dua kali. Aksi tulis data biarin tetap pakai postApi() biasa.
+        // ============================================================
+        const postApiWithRetry = async (params, opts) => {
+            const maxAttempts = (opts && opts.maxAttempts) || 3;
+            const timeoutMs = (opts && opts.timeoutMs) || 10000;
+            const delayMs = (opts && opts.delayMs) || 1200;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    const res = await fetch(URL_DATABASE_PERMANEN, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(params),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timer);
+                    return await res.json();
+                } catch (error) {
+                    clearTimeout(timer);
+                    if (attempt >= maxAttempts) {
+                        return { success: false, error: "Koneksi terblokir oleh Google atau jaringan terputus." };
+                    }
+                    await new Promise(r => setTimeout(r, delayMs));
+                    // lanjut ke percobaan berikutnya
+                }
             }
         };
 
@@ -876,7 +1003,7 @@ const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").
                     setLoading('MASUK OTOMATIS DARI HUB...');
                     setLoginError('');
                     try {
-                        const res = await postApi({ action: 'ssoLogin', ssoToken: ssoTokenFromUrl });
+                        const res = await postApiWithRetry({ action: 'ssoLogin', ssoToken: ssoTokenFromUrl });
                         if (!batal && res && res.success && res.data) {
                             const d = res.data;
                             setRole(d.role);
@@ -1216,7 +1343,7 @@ const refresh = useCallback(async () => {
         const tkn = yassaStore.get('yassa-token') || '';
         
         // 1. Tarik Data Utama (Bundle)
-        const resBundle = await postApi({ action: 'readBundle', token: tkn });
+        const resBundle = await postApiWithRetry({ action: 'readBundle', token: tkn });
 
         if (resBundle && resBundle.success) {
             const b = resBundle.data || {};
@@ -1242,7 +1369,7 @@ const refresh = useCallback(async () => {
             // 2. Tarik Data Global (Background jika ada Cache, Berurutan jika tidak ada Cache)
             if (!isOfflineCacheAvailable) {
                 try {
-                    const resGlobal = await postApi({ action: 'readDashboardGlobal', token: tkn });
+                    const resGlobal = await postApiWithRetry({ action: 'readDashboardGlobal', token: tkn });
                     if (resGlobal && resGlobal.success) {
                         const freshGlobal = {
                             keluarga: resGlobal.data.keluarga || [],
@@ -1259,7 +1386,7 @@ const refresh = useCallback(async () => {
                 setLoading(false);
             } else {
                 // Background fetch berjalan diam-diam
-                postApi({ action: 'readDashboardGlobal', token: tkn })
+                postApiWithRetry({ action: 'readDashboardGlobal', token: tkn })
                     .then(resGlobal => {
                         if (resGlobal && resGlobal.success) {
                             const freshGlobal = {
@@ -1301,7 +1428,7 @@ const refresh = useCallback(async () => {
                 
                 if (!isOfflineCacheAvailable) {
                     try {
-                        const resGlobal = await postApi({ action: 'readDashboardGlobal', token: tkn });
+                        const resGlobal = await postApiWithRetry({ action: 'readDashboardGlobal', token: tkn });
                         if (resGlobal && resGlobal.success) {
                             const fallbackGlobal = { keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] };
                             setDataGlobal(fallbackGlobal);
@@ -1310,7 +1437,7 @@ const refresh = useCallback(async () => {
                     } catch (e) {}
                     setLoading(false);
                 } else {
-                    postApi({ action: 'readDashboardGlobal', token: tkn })
+                    postApiWithRetry({ action: 'readDashboardGlobal', token: tkn })
                         .then(resGlobal => {
                             if (resGlobal && resGlobal.success) {
                                 const fallbackGlobal = { keluarga: resGlobal.data.keluarga || [], anak: resGlobal.data.anak || [], arsipAnak: resGlobal.data.arsipAnak || [] };
