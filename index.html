@@ -164,6 +164,37 @@ const hitungTotalSantunanGopay = (anakList, baseNom, bonusNom) => {
 
 // Fungsi pembersih ID Keluarga
 const normId = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
+
+// ============================================================
+// 🔒 MASKING NOMOR REKENING UNTUK LAPORAN DONATUR
+// Hanya menampilkan 4 digit/karakter pertama, sisanya disamarkan
+// dengan tanda bintang (*) demi menjaga privasi penerima manfaat.
+// Contoh: 1234567890  ->  1234******
+// ============================================================
+const maskRekeningDonatur = (rekeningRaw) => {
+    const bersih = String(rekeningRaw || '').trim();
+    if (!bersih || bersih === '-' || bersih.toUpperCase() === 'NA' || bersih.toUpperCase() === 'N/A') return '-';
+    if (bersih.length <= 4) return '*'.repeat(bersih.length); // terlalu pendek, samarkan semua demi keamanan
+    return bersih.slice(0, 4) + '*'.repeat(bersih.length - 4);
+};
+
+// ============================================================
+// 🔒 MASKING ATAS NAMA / PEMILIK REKENING UNTUK LAPORAN DONATUR
+// Kata pertama (nama depan) tetap terlihat sebagai penanda,
+// kata-kata berikutnya disamarkan penuh dengan tanda bintang (*)
+// demi menjaga privasi penerima manfaat.
+// Contoh: "SITI AMINAH"  ->  "SITI ******"
+// ============================================================
+const maskNamaPemilik = (namaRaw) => {
+    const bersih = String(namaRaw || '').trim();
+    if (!bersih || bersih === '-' || bersih.toUpperCase() === 'NA' || bersih.toUpperCase() === 'N/A') return '-';
+    const kata = bersih.split(/\s+/);
+    if (kata.length === 1) {
+        // Satu kata saja: tampilkan huruf pertama, sisanya disamarkan
+        return kata[0].length <= 2 ? '*'.repeat(kata[0].length) : kata[0][0] + '*'.repeat(kata[0].length - 1);
+    }
+    return [kata[0], ...kata.slice(1).map(k => '*'.repeat(k.length))].join(' ');
+};
 </script>
 <script>
     // DATA KONFIGURASI FORM DAN WILAYAH
@@ -5132,6 +5163,21 @@ const submitArchiveChildren = async () => {
                                                             </button>
                                                         )}
 
+                                                        {/* TOMBOL CETAK LAPORAN DONATUR - REKENING DISAMARKAN - HANYA ADMIN */}
+                                                        {role === 'admin' && (
+                                                            <button onClick={() => {
+                                                                setLoading("MEMUAT LAPORAN DONATUR...");
+                                                                setTimeout(() => {
+                                                                    setPrintMode('donatur');
+                                                                    const scrollArea = document.getElementById('scroll-area');
+                                                                    if (scrollArea) scrollArea.scrollTop = 0;
+                                                                    setLoading(false);
+                                                                }, 150);
+                                                            }} className="p-4 px-6 rounded-xl bg-[#E0E5EC] border-none text-rose-700 transition-all flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-95 w-full" title="Laporan untuk donatur, nomor rekening disamarkan demi privasi">
+                                                                <Icon name="shield" size={18} /> Cetak Laporan Donatur
+                                                            </button>
+                                                        )}
+
                                                         {role === 'admin' && (
                                                            <button onClick={handleDownloadCSVMidtrans} className="p-4 px-6 rounded-xl bg-[#E0E5EC] border-none text-violet-700 transition-all flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-95 relative w-full" title="Download CSV untuk Upload Disbursement Midtrans">
                                                                 <Icon name="download" size={18} /> Unduh CSV Midtrans
@@ -6064,6 +6110,322 @@ const submitArchiveChildren = async () => {
                                                                         <td colSpan={6} className="border border-slate-800 p-2 text-right font-black uppercase text-[11px]">Subtotal Transfer (RP)</td>
                                                                         <td className="border border-slate-800 p-2 text-right font-black text-[11px] text-nowrap">Rp {transferData.sumNominal.toLocaleString('id-ID')}</td>
                                                                         <td colSpan={4} className="border border-slate-800 p-2"></td>
+                                                                    </tr>
+                                                                </tfoot>
+                                                            )}
+                                                        </table>
+                                                    </div>
+                                                    
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                                {(printMode === 'donatur' && role === 'admin') && (
+                                    <div className="w-full bg-white text-slate-900 pb-10">
+                                        <style>{`
+                                            @media print { 
+                                                @page { size: A4 portrait !important; margin: 10mm !important; } 
+                                                body { background-color: white !important; }
+                                                #main-app-container { height: auto !important; overflow: visible !important; }
+                                                #scroll-area { overflow: visible !important; }
+                                            }
+                                        `}</style>
+                                        
+                                        <div className="no-print flex flex-wrap gap-2 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <Icon name="alert-triangle" size={20} className="text-amber-500" />
+                                                <p className="text-[10px] font-bold text-slate-600 uppercase">Gunakan Kertas A4 Portrait untuk mencetak laporan ini. Nomor rekening disamarkan (hanya 4 digit awal) demi menjaga privasi.</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setPrintMode('card')} className="bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-300 transition-all flex items-center gap-2 shadow-sm">
+                                                    <Icon name="chevron-left" size={14} /> Kembali
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        setMsg('🖨️ Menyiapkan data & file PDF...');
+                                                        setTimeout(() => {
+                                                            const originalTitle = document.title;
+                                                            const printWilayah = filterWilayah ? filterWilayah.toUpperCase() : (role === 'korwil' && allowedRegions.length > 0 ? allowedRegions[0] : 'SEMUA WILAYAH');
+                                                            const printBulan = printMonthInput ? printMonthInput.toUpperCase() : new Date().toLocaleDateString('id-ID', {month: 'long', year: 'numeric'}).toUpperCase();
+                                                            document.title = `Laporan Donatur ${printWilayah} - ${printBulan}`;
+                                                            
+                                                            const body = document.body;
+                                                            const mainApp = document.getElementById('main-app-container');
+                                                            const scrollArea = document.getElementById('scroll-area');
+                                                            
+                                                            body.classList.remove('overflow-hidden');
+                                                            if(mainApp) { mainApp.classList.remove('h-screen', 'overflow-hidden'); mainApp.classList.add('h-auto'); }
+                                                            if(scrollArea) scrollArea.classList.remove('overflow-y-auto');
+
+                                                            setTimeout(() => {
+                                                                window.print();
+                                                                setTimeout(() => {
+                                                                    document.title = originalTitle;
+                                                                    body.classList.add('overflow-hidden');
+                                                                    if(mainApp) { mainApp.classList.add('h-screen', 'overflow-hidden'); mainApp.classList.remove('h-auto'); }
+                                                                    if(scrollArea) scrollArea.classList.add('overflow-y-auto');
+                                                                    setMsg('');
+                                                                }, 1000);
+                                                            }, 500);
+                                                        }, 100);
+                                                    }} 
+                                                    className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 shadow-md"
+                                                >
+                                                    <Icon name="printer" size={14} /> Cetak Laporan Donatur
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {(() => {
+                                            // Memfilter data keseluruhan (tanpa memisah amplop/transfer secara hardcode, tapi kita bagi 2 array)
+                                            const dataReport = filteredKeluarga.filter(item => {
+                                                const famId = norm(getVal(item, 'ID_Keluarga'));
+                                                const namaAlm = getVal(item, 'NAMA ALM');
+                                                
+                                                // 1. Mencegah baris kosong dari database
+                                                if (!famId && !namaAlm) return false;
+                                                
+                                                // 2. Jika ada keluarga yang diceklis, hanya tampilkan yang diceklis
+                                                if (selectedForPrint.length > 0 && !selectedForPrint.includes(famId)) return false;
+                                                
+                                                // 3. Pastikan keluarga tersebut setidaknya memiliki anak sesuai filter Program
+                                                const targetAnakList = (anakByKeluargaMap[famId] || []).filter(c => {
+                                                    if (norm(getVal(c, 'ID_Keluarga')) !== famId) return false;
+                                                    const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
+                                                    if (filterProgram === 'Gopay') return p.includes('gopay');
+                                                    if (filterProgram === 'SAPA') return p.includes('sapa') || p.includes('asuh') || p.includes('ota');
+                                                    return p.includes('gopay') || p.includes('sapa') || p.includes('asuh') || p.includes('ota');
+                                                });
+                                                if (targetAnakList.length === 0) return false;
+                                                
+                                                return true;
+                                            });
+
+                                            // PEMISAHAN DATA AMPLOP & TRANSFER
+                                            const dataAmplop = [];
+                                            const dataTransfer = [];
+
+                                            dataReport.forEach(item => {
+                                                const famId = norm(getVal(item, 'ID_Keluarga'));
+                                                const pColor = paperColors[famId] || autoPaperColorMap[famId] || 'PUTIH';
+                                                const warnaKertas = (getVal(item, 'WARNA KERTAS') || '').toUpperCase();
+                                                const keterangan = (getVal(item, 'KETERANGAN PEMILIK') || '').toUpperCase();
+                                                const namaBankFormat = (getVal(item, 'BANK') || '').toUpperCase();
+                                                const rekeningFormat = (getVal(item, 'REKENING') || '').trim(); // Tambahan Pengecekan Rekening Kosong
+                                                
+                                                // Logika penentuan Amplop
+                                                const isAmplop = pColor === 'KUNING' ||
+                                                                 warnaKertas.includes('KUNING') ||
+                                                                 keterangan.includes('KUNING') || keterangan.includes('AMPLOP') ||
+                                                                 namaBankFormat.includes('KUNING') || namaBankFormat.includes('AMPLOP') ||
+                                                                 namaBankFormat === 'TUNAI' || namaBankFormat === 'CASH' ||
+                                                                 rekeningFormat === '' || rekeningFormat === '-'; // Memasukkan kondisi rekening kosong
+                                                
+                                                if (isAmplop) {
+                                                    dataAmplop.push(item);
+                                                } else {
+                                                    dataTransfer.push(item);
+                                                }
+                                            });
+
+                                            let grandSumAnak = 0;
+                                            let grandSumYt = 0; // MENAMBAHKAN VARIABEL UNTUK GRAND TOTAL YTM
+                                            let grandSumYP = 0;
+                                            let grandSumDsb = 0;
+                                            let grandSumNominal = 0;
+
+                                            // FUNGSI UNTUK MERENDER ROW DAN MENGHITUNG SUBTOTAL MASING-MASING
+                                            const generateRowsAndStats = (dataset) => {
+                                                let sumAnak = 0, sumYt = 0, sumYP = 0, sumDsb = 0, sumNominal = 0;
+                                                const rows = dataset.map((item, idx) => {
+                                                    const famId = norm(getVal(item, 'ID_Keluarga'));
+                                                    
+                                                    // Ambil daftar anak sesuai filter program
+                                                    const targetAnakList = (anakByKeluargaMap[famId] || []).filter(c => {
+                                                        if (norm(getVal(c, 'ID_Keluarga')) !== famId) return false;
+                                                        const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
+                                                        if (filterProgram === 'Gopay') return p.includes('gopay');
+                                                        if (filterProgram === 'SAPA') return p.includes('sapa') || p.includes('asuh') || p.includes('ota');
+                                                        return p.includes('gopay') || p.includes('sapa') || p.includes('asuh') || p.includes('ota');
+                                                    });
+                                                    
+                                                    let aYt = 0, aYp = 0, aDsb = 0;
+                                                    
+                                                    targetAnakList.forEach(c => {
+                                                        const yt = (getVal(c, 'YATIM') || '').trim().toUpperCase();
+                                                        const yp = (getVal(c, 'YATIM PIATU') || '').trim().toUpperCase();
+                                                        const dsb = (getVal(c, 'DISABILITAS') || '').trim().toUpperCase();
+                                                        
+                                                        if (yt === 'YA' || yt === 'Y' || yt.includes('YATIM')) aYt++;
+                                                        if (yp === 'YA' || yp === 'Y' || yp.includes('PIATU')) aYp++;
+                                                        if (dsb === 'YA' || dsb === 'Y' || dsb.includes('DISABILITAS')) aDsb++;
+                                                    });
+
+                                                    const ibuDsb = (getVal(item, 'KATAGORI ISTRI') || '').toUpperCase().includes('DISABILITAS') ? 1 : 0;
+                                                    const totDsb = aDsb + ibuDsb;
+
+                                                    // Hitung Nominal berdasarkan program
+                                                    const gopayAnak = targetAnakList.filter(c => (getVal(c, 'PROGRAM') || '').toLowerCase().includes('gopay'));
+                                                    const sapaAnak = targetAnakList.filter(c => {
+                                                        const p = (getVal(c, 'PROGRAM') || '').toLowerCase();
+                                                        return p.includes('sapa') || p.includes('asuh') || p.includes('ota');
+                                                    });
+
+                                                    let gopayAmt = 0;
+                                                    if (gopayAnak.length > 0) {
+                                                        const baseNom = parseInt(printBaseNominal || 0);
+                                                        const bonusNom = parseInt(printBonusNominal || 0);
+                                                        gopayAmt = typeof hitungTotalSantunanGopay !== 'undefined' 
+                                                            ? hitungTotalSantunanGopay(gopayAnak, baseNom, bonusNom)
+                                                            : ((gopayAnak.length * baseNom) + ((aYp + aDsb) * bonusNom));
+                                                            
+                                                        // TAMBAHAN BONUS IBU DISABILITAS
+                                                        if (ibuDsb > 0) {
+                                                            gopayAmt += bonusNom;
+                                                        }
+                                                    }
+
+                                                    let sapaAmt = 0;
+                                                    sapaAnak.forEach(c => {
+                                                        const nominalStr = String(getVal(c, 'SANTUNAN SAPA')).replace(/[^0-9]/g, '');
+                                                        if (nominalStr) sapaAmt += parseInt(nominalStr);
+                                                    });
+
+                                                    const trfAmt = gopayAmt + sapaAmt;
+
+                                                    sumAnak += targetAnakList.length;
+                                                    sumYt += aYt; 
+                                                    sumYP += aYp;
+                                                    sumDsb += totDsb;
+                                                    sumNominal += trfAmt;
+
+                                                    const progText = filterProgram === 'Gopay' ? 'GOPAY' : (filterProgram === 'SAPA' ? 'SAPA' : 'SANTUNAN');
+                                                    const remark = `${(getVal(item, 'NAMA ALM') || '').toUpperCase()} ${trfAmt > 0 ? trfAmt.toLocaleString('id-ID') : ''} ${progText} ${printMonthInput ? printMonthInput.toUpperCase() : ''}`.trim();
+
+                                                    return (
+                                                        <tr key={idx} className="border-b border-slate-400" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                                                            <td className="p-1.5 border-r border-slate-400 text-center">{idx + 1}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-left">{getVal(item, 'WILAYAH')}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 font-bold text-left">{getVal(item, 'NAMA ALM')}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-center font-bold">{aYt > 0 ? aYt : ''}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-center">{aYp > 0 ? aYp : ''}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-center">{totDsb > 0 ? totDsb : ''}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-right font-bold text-nowrap">Rp {trfAmt.toLocaleString('id-ID')}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-center text-[8px] uppercase">{getVal(item, 'BANK')}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 font-mono text-[9px] text-nowrap">{maskRekeningDonatur(getVal(item, 'REKENING'))}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-[8px] uppercase text-nowrap">{maskNamaPemilik(getVal(item, 'PEMILIK') || getVal(item, 'NAMA IBU'))}</td>
+                                                            <td className="p-1.5 border-r border-slate-400 text-[8px] whitespace-normal break-all max-w-[100px]">{getVal(item, 'EMAIL KORWIL')}</td>
+                                                            {/* KOLOM KETERANGAN DENGAN WORD WRAP AGAR TIDAK KEPOTONG */}
+                                                            <td className="p-1.5 text-[8px] italic text-left" style={{ whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: '250px', lineHeight: '1.2' }}>{remark}</td>
+                                                        </tr>
+                                                    );
+                                                });
+                                                
+                                                grandSumAnak += sumAnak;
+                                                grandSumYt += sumYt; // TAMBAH KE GRAND TOTAL YTM
+                                                grandSumYP += sumYP;
+                                                grandSumDsb += sumDsb;
+                                                grandSumNominal += sumNominal;
+
+                                                return { rows, sumAnak, sumYt, sumYP, sumDsb, sumNominal };
+                                            };
+
+                                            const amplopData = generateRowsAndStats(dataAmplop);
+                                            const transferData = generateRowsAndStats(dataTransfer);
+
+                                            return (
+                                                <div className="w-full bg-white font-sans pt-4">
+                                                    
+                                                    {/* JUDUL LAPORAN */}
+                                                    <h2 className="text-center font-black text-sm uppercase mb-4 tracking-widest bg-slate-900 text-white py-2 rounded-t-xl mx-auto w-fit px-8 shadow-sm">
+                                                        LAPORAN DONATUR - PENDISTRIBUSIAN SANTUNAN - {printMonthInput || new Date().toLocaleDateString('id-ID', {month:'long', year:'numeric'}).toUpperCase()}
+                                                    </h2>
+
+                                                    {/* RINGKASAN DATA (GRAND TOTAL KESELURUHAN) */}
+                                                    <div className="flex gap-4 mb-8 text-[10px] font-bold border-2 border-slate-800 p-3 rounded-lg bg-slate-50 justify-between items-center shadow-sm" style={{ backgroundColor: '#f8fafc', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                                        <div className="flex gap-4 lg:gap-6 flex-wrap">
+                                                            <span>TOTAL KK: <span className="text-blue-700 text-sm font-black">{dataReport.length}</span></span>
+                                                            <span>TOTAL ANAK: <span className="text-blue-700 text-sm font-black">{grandSumAnak}</span></span>
+                                                            <span>YATIM: <span className="text-blue-700 text-sm font-black">{grandSumYt}</span></span>
+                                                            <span>YATIM PIATU: <span className="text-purple-700 text-sm font-black">{grandSumYP}</span></span>
+                                                            <span>DISABILITAS (AN+IB): <span className="text-amber-700 text-sm font-black">{grandSumDsb}</span></span>
+                                                        </div>
+                                                        <span className="text-base text-green-700 font-black whitespace-nowrap bg-green-100 px-3 py-1 rounded-md border border-green-200" style={{ backgroundColor: '#dcfce7', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>GRAND TOTAL: Rp {grandSumNominal.toLocaleString('id-ID')}</span>
+                                                    </div>
+
+                                                    {/* TABEL 1: AMPLOP */}
+                                                    <div className="mb-10">
+                                                        <h3 className="font-black text-[12px] uppercase text-slate-800 mb-2">1. Pendistribusian lewat Amplop / Tunai</h3>
+                                                        <table className="w-full text-[10px] border-collapse border border-slate-800 shadow-sm" style={{ width: '100%', pageBreakInside: 'auto' }}>
+                                                            <thead className="bg-slate-200" style={{ display: 'table-header-group', backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                                                <tr>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center">NO</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">WILAYAH</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">NAMA ALM</th>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center" title="Yatim">YTM</th>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center" title="Yatim Piatu">PTU</th>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center" title="Disabilitas">DSB</th>
+                                                                    <th className="border border-slate-800 p-2 text-right">JUMLAH (RP)</th>
+                                                                    <th className="border border-slate-800 p-2 text-center">BANK</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">NO REK</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">ATAS NAMA</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">EMAIL KORWIL</th>
+                                                                    <th className="border border-slate-800 p-2 text-left w-[20%]">KETERANGAN</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {amplopData.rows.length > 0 ? amplopData.rows : (
+                                                                    <tr>
+                                                                        <td colSpan={12} className="p-4 text-center font-bold italic text-slate-500">Tidak ada data distribusi lewat amplop.</td>
+                                                                    </tr>
+                                                                )}
+                                                            </tbody>
+                                                            {amplopData.rows.length > 0 && (
+                                                                <tfoot className="bg-slate-200" style={{ display: 'table-row-group', backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                                                    <tr>
+                                                                        <td colSpan={6} className="border border-slate-800 p-2 text-right font-black uppercase text-[11px]">Subtotal Amplop (RP)</td>
+                                                                        <td className="border border-slate-800 p-2 text-right font-black text-[11px] text-nowrap">Rp {amplopData.sumNominal.toLocaleString('id-ID')}</td>
+                                                                        <td colSpan={5} className="border border-slate-800 p-2"></td>
+                                                                    </tr>
+                                                                </tfoot>
+                                                            )}
+                                                        </table>
+                                                    </div>
+
+                                                    {/* TABEL 2: TRANSFER */}
+                                                    <div className="mb-10">
+                                                        <h3 className="font-black text-[12px] uppercase text-slate-800 mb-2">2. Pendistribusian Lewat Transfer Bank</h3>
+                                                        <table className="w-full text-[10px] border-collapse border border-slate-800 shadow-sm" style={{ width: '100%', pageBreakInside: 'auto' }}>
+                                                            <thead className="bg-slate-200" style={{ display: 'table-header-group', backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                                                <tr>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center">NO</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">WILAYAH</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">NAMA ALM</th>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center" title="Yatim">YTM</th>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center" title="Yatim Piatu">PTU</th>
+                                                                    <th className="border border-slate-800 p-2 w-8 text-center" title="Disabilitas">DSB</th>
+                                                                    <th className="border border-slate-800 p-2 text-right">JUMLAH (RP)</th>
+                                                                    <th className="border border-slate-800 p-2 text-center">BANK</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">NO REK</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">ATAS NAMA</th>
+                                                                    <th className="border border-slate-800 p-2 text-left">EMAIL KORWIL</th>
+                                                                    <th className="border border-slate-800 p-2 text-left w-[20%]">KETERANGAN</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {transferData.rows.length > 0 ? transferData.rows : (
+                                                                    <tr>
+                                                                        <td colSpan={12} className="p-4 text-center font-bold italic text-slate-500">Tidak ada data distribusi lewat transfer.</td>
+                                                                    </tr>
+                                                                )}
+                                                            </tbody>
+                                                            {transferData.rows.length > 0 && (
+                                                                <tfoot className="bg-slate-200" style={{ display: 'table-row-group', backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                                                    <tr>
+                                                                        <td colSpan={6} className="border border-slate-800 p-2 text-right font-black uppercase text-[11px]">Subtotal Transfer (RP)</td>
+                                                                        <td className="border border-slate-800 p-2 text-right font-black text-[11px] text-nowrap">Rp {transferData.sumNominal.toLocaleString('id-ID')}</td>
+                                                                        <td colSpan={5} className="border border-slate-800 p-2"></td>
                                                                     </tr>
                                                                 </tfoot>
                                                             )}
