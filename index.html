@@ -551,6 +551,24 @@ const maskNamaPemilik = (namaRaw) => {
             }
         })();
 
+        // ============================================================
+        // 🔔 notifOnly=1 — tab ini dibuka Hub KHUSUS buat minta izin
+        // notifikasi (lewat tombol "Aktifkan Notifikasi" di Hub), BUKAN
+        // buat dipakai sebagai app beneran. Kalau flag ini ada: begitu
+        // SSO login sukses, JANGAN render dashboard/menu sama sekali --
+        // cukup minta izin notifikasi, lapor ke Hub, lalu logout sendiri
+        // (client & server) supaya sesi ini gak nganggur aktif kalau
+        // tabnya lupa/gak bisa ditutup. Lihat useEffect SSO & gate render
+        // di bagian JSX untuk logikanya.
+        // ============================================================
+        const notifOnly = (() => {
+            try {
+                return new URLSearchParams(window.location.search).get('notifOnly') === '1';
+            } catch (e) {
+                return false;
+            }
+        })();
+
         // GitHub Pages: URL GAS sudah dikonfigurasi di atas
 
         const getVal = (obj, key) => {
@@ -1003,6 +1021,11 @@ const maskNamaPemilik = (namaRaw) => {
             // ============================================================
             const [ssoProcessing, setSsoProcessing] = useState(!!ssoTokenFromUrl);
 
+            // 🔔 Status layar "notifOnly": 'requesting' selama proses minta izin
+            // masih jalan, 'done' kalau sudah kelar (apapun hasil izinnya) &
+            // sesi sudah di-logout, 'error' kalau SSO-nya sendiri gagal/basi.
+            const [notifOnlyStatus, setNotifOnlyStatus] = useState(notifOnly ? 'requesting' : null);
+
             // ============================================================
             // 🆕 Teks motivasi yang bergilir selama layar "masuk otomatis
             // dari Hub" tampil (ssoProcessing masih true). Ganti kalimat
@@ -1037,6 +1060,46 @@ const maskNamaPemilik = (namaRaw) => {
                         const res = await postApiWithRetry({ action: 'ssoLogin', ssoToken: ssoTokenFromUrl });
                         if (!batal && res && res.success && res.data) {
                             const d = res.data;
+
+                            // ========================================================
+                            // 🔔 CABANG notifOnly: JANGAN login penuh / render app.
+                            // Simpan token SEMENTARA (dibutuhkan initPushNotification
+                            // buat subscribeToTopic), minta izin notifikasi, lapor
+                            // hasilnya ke Hub (window.opener) via notifyHubNotifStatus
+                            // yang sudah dipanggil di dalam initPushNotification, lalu
+                            // HAPUS sesi ini lagi -- baik di client (yassaStore.clear())
+                            // maupun di server (action 'logout') -- supaya gak ada sesi
+                            // nganggur yang bisa dipakai buka-buka data walau niatnya
+                            // cuma minta izin notifikasi.
+                            // ========================================================
+                            if (notifOnly) {
+                                try {
+                                    if (d.token) yassaStore.set('yassa-token', d.token);
+                                    if (typeof initPushNotification === 'function') {
+                                        await initPushNotification(d.username || '');
+                                    }
+                                } catch (e) { console.log('initPushNotification (notifOnly) gagal:', e); }
+                                try {
+                                    await postApi({ action: 'logout', token: d.token });
+                                } catch (e) { console.log('logout (notifOnly) gagal:', e); }
+                                try { yassaStore.clear(); } catch (e) {}
+                                try {
+                                    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+                                } catch (e) {}
+                                if (!batal) {
+                                    setNotifOnlyStatus('done');
+                                    setLoading(false);
+                                    setSsoProcessing(false);
+                                }
+                                // Coba nutup tab otomatis (cuma berhasil kalau tab ini
+                                // memang dibuka via window.open() dari Hub, seperti
+                                // biasanya buat alur notifOnly ini). Kalau gagal
+                                // (browser larang), gapapa -- layar "done" di bawah
+                                // sudah kasih tau user boleh nutup manual.
+                                try { window.close(); } catch (e) {}
+                                return; // STOP di sini, jangan lanjut ke alur login penuh
+                            }
+
                             setRole(d.role);
                             setUserWilayah(d.wilayah);
                             setActiveUser(d.username || '');
@@ -1099,6 +1162,7 @@ const maskNamaPemilik = (namaRaw) => {
                             // Tiket gagal/basi -- diamkan saja, biarkan user login manual seperti biasa
                             // (jangan tampilkan error yang bikin bingung sebelum user sempat coba apa-apa).
                             console.log('SSO gagal:', res && res.error);
+                            if (notifOnly) setNotifOnlyStatus('error');
                         }
                     } catch (e) {
                         console.log('SSO error:', e);
@@ -3662,6 +3726,48 @@ const submitArchiveChildren = async () => {
                         </div>
                         
                         <p className="text-slate-400 text-[11px] font-medium tracking-wide animate-pulse">{splashTeks}</p>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // 🔔 GATE notifOnly — PALING ATAS, ngalahin semua gate lain.
+            // Tab ini cuma buat minta izin notifikasi, jadi apapun status
+            // login/role/embed-nya, JANGAN PERNAH tembus ke form login
+            // manual ataupun dashboard app. Cukup 3 layar sederhana:
+            // "lagi minta izin" -> "selesai, boleh ditutup" / "gagal".
+            // ============================================================
+            if (notifOnly) {
+                const isDone = notifOnlyStatus === 'done';
+                const isError = notifOnlyStatus === 'error';
+                return (
+                    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center px-6 text-center" style={{ background: 'radial-gradient(circle at 50% 0%, #1a2332 0%, #0B0F19 60%)', fontFamily: "'Plus Jakarta Sans', 'Hanken Grotesk', sans-serif" }}>
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                            <span className="text-3xl">{isError ? '⚠️' : (isDone ? '✅' : '🔔')}</span>
+                        </div>
+                        <h1 className="text-white text-xl font-bold mb-2">
+                            {isError ? 'Tiket sudah tidak berlaku' : (isDone ? 'Selesai' : 'Meminta izin notifikasi…')}
+                        </h1>
+                        <p className="text-slate-400 text-sm leading-relaxed max-w-xs mb-2">
+                            {isError
+                                ? 'Silakan kembali ke Yassa Hub dan tekan tombol "Aktifkan Notifikasi" lagi.'
+                                : (isDone
+                                    ? 'Izin notifikasi sudah diproses. Tab ini boleh ditutup — sesi login sementaranya sudah otomatis dimatikan.'
+                                    : 'Tekan "Allow" saat browser menampilkan permintaan izin notifikasi. Tab ini tidak menampilkan data apa pun.')}
+                        </p>
+                        {!isDone && !isError && (
+                            <div className="w-48 sm:w-56 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-4 relative">
+                                <div className="absolute top-0 left-0 h-full w-1/2 bg-gradient-to-r from-emerald-400 via-green-500 to-emerald-600 rounded-full anim-loading-bar shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                            </div>
+                        )}
+                        {(isDone || isError) && (
+                            <button
+                                onClick={() => { try { window.close(); } catch (e) {} }}
+                                className="w-full max-w-xs bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] transition text-[#0B0F19] font-bold text-sm py-3.5 rounded-xl shadow-[0_8px_24px_rgba(16,185,129,0.35)] mt-6"
+                            >
+                                Tutup Tab Ini
+                            </button>
+                        )}
                     </div>
                 );
             }
