@@ -684,6 +684,44 @@ const maskNamaPemilik = (namaRaw) => {
             return res;
         };
 
+        // ============================================================
+        // 🆕 DETEKSI NAMA ALM MIRIP/SAMA SAAT TAMBAH DATA KELUARGA
+        // ============================================================
+        // Dipakai KHUSUS untuk action 'create' di sheet Keluarga. Server akan
+        // menolak sementara dengan error berformat "PERINGATAN_NAMA_MIRIP::{...json...}"
+        // kalau NAMA ALM yang diinput sudah ada di database (lihat createData_ di
+        // backend). Ini BUKAN error permanen -- cuma peringatan, karena nama sama
+        // antar keluarga berbeda itu wajar terjadi. Fungsi ini menampilkan detail
+        // keluarga yang sudah ada dengan nama sama, lalu menawarkan pilihan
+        // LANJUTKAN (kirim ulang dengan confirmDuplicateNama:true) atau BATAL
+        // (supaya admin bisa cek ulang data sebelum submit).
+        const postApiCreateKeluarga = async (params) => {
+            const res = await postApi(params);
+            if (res && res.success === false && typeof res.error === 'string' && res.error.startsWith('PERINGATAN_NAMA_MIRIP::')) {
+                let detail;
+                try { detail = JSON.parse(res.error.substring('PERINGATAN_NAMA_MIRIP::'.length)); } catch (e) { detail = null; }
+
+                if (!detail || !Array.isArray(detail.dataSerupa)) {
+                    return { success: false, error: "Terjadi kesalahan saat memeriksa data serupa, silakan coba lagi." };
+                }
+
+                const daftarSerupa = detail.dataSerupa
+                    .map(d => `• ID: ${d.id || '-'}\n   Wilayah: ${d.wilayah || '-'}\n   No HP: ${d.noHp || '-'}`)
+                    .join('\n\n');
+
+                const pesan = `⚠️ NAMA ALM SUDAH ADA DI DATABASE!\n\nSudah ada data keluarga dengan nama Alm "${detail.namaAlm}":\n\n${daftarSerupa}\n\nKalau ini memang keluarga yang BEDA (nama kebetulan sama), klik OK untuk tetap lanjutkan.\nKalau ternyata keluarga yang SAMA (data ganda), klik Batal dan cek ulang.`;
+
+                const mauLanjut = window.confirm(pesan);
+                if (mauLanjut) {
+                    // Kirim ulang, kali ini tandai sudah dikonfirmasi admin
+                    return await postApi({ ...params, data: { ...params.data, confirmDuplicateNama: true } });
+                } else {
+                    return { success: false, error: "Dibatalkan oleh admin (nama alm terdeteksi mirip).", isCancelledConflict: true };
+                }
+            }
+            return res;
+        };
+
         // KOMPONEN TOMBOL DOKUMEN ARSIP KELUARGA (Manajemen_Arsip)
         // Menampilkan tombol klik untuk tiap link dokumen + info lokasi fisik & kode berkas.
         // Data arsip di-input/edit manual langsung di Google Sheet "Manajemen_Arsip".
@@ -3629,7 +3667,7 @@ const submitArchiveChildren = async () => {
                         originalData: isUpdateKeluarga ? familyOriginalSnapshot : undefined,
                         token: token
                     };
-                    const resKeluarga = await (isUpdateKeluarga ? postApiUpdate : postApi)(payloadKeluarga);
+                    const resKeluarga = await (isUpdateKeluarga ? postApiUpdate : postApiCreateKeluarga)(payloadKeluarga);
                     if (!resKeluarga.success) {
                         // FIX: di-await agar state data sudah pasti ter-update sebelum
                         // pesan error ditampilkan ke admin (hindari tampilan data basi).
