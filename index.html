@@ -1025,6 +1025,10 @@ const maskNamaPemilik = (namaRaw) => {
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [loginError, setLoginError] = useState('');
+            // 🆕 Status tombol "Coba Sambungkan Lagi" (retry SSO manual dari form
+            // login, dipakai kalau percobaan otomatis gagal -- mis. sinyal lemah --
+            // biar user gak perlu balik dulu ke Hub buat coba ulang.
+            const [retryingSso, setRetryingSso] = useState(false);
 
             // ============================================================
             // 🚪 GERBANG PENGALIHAN KE YASSA HUB
@@ -1082,22 +1086,25 @@ const maskNamaPemilik = (namaRaw) => {
 
             // ============================================================
             // 🔗 SSO AUTO-LOGIN — dipicu kalau ada ?sso=... di URL (dibuka
-            // dari YASSA Hub). Cuma jalan SEKALI pas komponen mount.
+            // dari YASSA Hub). Logikanya ditaruh di fungsi jalankanTiketSso
+            // (bukan langsung di dalam useEffect) supaya bisa DIPANGGIL ULANG
+            // oleh tombol "Coba Sambungkan Lagi" di form login manual (lihat
+            // render form login) -- dulu kalau percobaan otomatis gagal
+            // (mis. sinyal lemah), satu-satunya jalan retry adalah balik ke
+            // Hub dulu lalu buka Mobile lagi dari nol. Tiket SSO aman dipakai
+            // ulang di sini karena backend (handleSsoLogin di Code.gs) sudah
+            // idempotent terhadap tiket yang sama (lihat cache 'sso_used_').
             // ============================================================
-            React.useEffect(() => {
+            const jalankanTiketSso = React.useCallback(async (opts) => {
                 if (!ssoTokenFromUrl) return;
-                // PERBAIKAN: Baris "if (role) return;" DIHAPUS agar setiap ada tiket
-                // baru dari YASSA Hub, sistem akan SELALU memprosesnya dan menimpa 
-                // sisa memori login akun lama di perangkat ini.
-
-                let batal = false;
-                (async () => {
-                    setLoading('MASUK OTOMATIS DARI HUB...');
-                    setLoginError('');
-                    try {
-                        const res = await postApiWithRetry({ action: 'ssoLogin', ssoToken: ssoTokenFromUrl });
-                        if (!batal && res && res.success && res.data) {
-                            const d = res.data;
+                const isCancelled = (opts && opts.isCancelled) || (() => false);
+                setSsoProcessing(true);
+                setLoading('MASUK OTOMATIS DARI HUB...');
+                setLoginError('');
+                try {
+                    const res = await postApiWithRetry({ action: 'ssoLogin', ssoToken: ssoTokenFromUrl });
+                    if (!isCancelled() && res && res.success && res.data) {
+                        const d = res.data;
 
                             // ========================================================
                             // 🔔 CABANG notifOnly: JANGAN login penuh / render app.
@@ -1124,7 +1131,7 @@ const maskNamaPemilik = (namaRaw) => {
                                 try {
                                     window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
                                 } catch (e) {}
-                                if (!batal) {
+                                if (!isCancelled()) {
                                     setNotifOnlyStatus('done');
                                     setLoading(false);
                                     setSsoProcessing(false);
@@ -1196,31 +1203,61 @@ const maskNamaPemilik = (namaRaw) => {
                                     if (typeof initPushNotification === 'function') initPushNotification(d.username || '');
                                 }
                             } catch (e) { console.log('FCM Error diabaikan:', e); }
-                        } else if (!batal) {
-                            // Tiket gagal/basi -- diamkan saja, biarkan user login manual seperti biasa
-                            // (jangan tampilkan error yang bikin bingung sebelum user sempat coba apa-apa).
+                        } else if (!isCancelled()) {
+                            // 🩹 FIX: dulu tiket gagal/basi cuma di-log ke console, user cuma
+                            // lihat form login muncul tiba-tiba tanpa tahu kenapa. Sekarang
+                            // pesan error dari backend (sudah jelas & berbahasa Indonesia,
+                            // mis. "Tiket SSO sudah kedaluwarsa...") ditampilkan langsung di
+                            // form, supaya user paham ini soal koneksi/sinyal, BUKAN akun
+                            // salah -- dan tombol "Coba Sambungkan Lagi" di form jadi ada gunanya.
                             console.log('SSO gagal:', res && res.error);
+                            setLoginError(
+                                (res && res.error)
+                                    ? res.error
+                                    : 'Masuk otomatis dari Hub gagal (kemungkinan sinyal lemah). Silakan coba lagi atau masuk manual di bawah.'
+                            );
                             if (notifOnly) setNotifOnlyStatus('error');
                         }
                     } catch (e) {
                         console.log('SSO error:', e);
+                        if (!isCancelled()) {
+                            setLoginError('Masuk otomatis dari Hub gagal, sepertinya koneksi/sinyal sedang tidak stabil. Silakan coba lagi.');
+                        }
                     }
-                    // Bersihkan ?sso=... dari URL supaya tiket (sekali-pakai) tidak
-                    // ketinggalan di address bar & tidak dicoba lagi kalau di-refresh.
-                    try {
-                        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-                    } catch (e) {}
-                    if (!batal) {
+                    if (!isCancelled()) {
                         setLoading(false);
                         // 🩹 FIX: baru boleh buka gerbang ke form login manual
                         // SETELAH proses SSO ini beneran kelar (sukses set role,
                         // atau gagal/basi -- lihat komentar ssoProcessing di atas).
                         setSsoProcessing(false);
                     }
-                })();
+            }, [ssoTokenFromUrl, notifOnly, isEmbedMode]);
 
+            // Percobaan OTOMATIS SEKALI pas komponen ini pertama kali muncul.
+            React.useEffect(() => {
+                if (!ssoTokenFromUrl) return;
+                let batal = false;
+                (async () => {
+                    await jalankanTiketSso({ isCancelled: () => batal });
+                    // Bersihkan ?sso=... dari URL supaya tiket (sekali-pakai) tidak
+                    // ketinggalan di address bar & tidak dicoba lagi kalau di-refresh.
+                    try {
+                        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+                    } catch (e) {}
+                })();
                 return () => { batal = true; };
             }, []); // cuma jalan sekali pas komponen ini pertama kali muncul
+
+            // 🆕 Dipanggil dari tombol "Coba Sambungkan Lagi" di form login manual.
+            const cobaSsoLagi = async () => {
+                if (!ssoTokenFromUrl || retryingSso) return;
+                setRetryingSso(true);
+                try {
+                    await jalankanTiketSso();
+                } finally {
+                    setRetryingSso(false);
+                }
+            };
 
             // --- MULAI KODE BARU: INISIALISASI LOGIN GOOGLE ---
             React.useEffect(() => {
@@ -3909,6 +3946,21 @@ const submitArchiveChildren = async () => {
                                     <div className="mb-3 text-rose-600 bg-rose-50 p-2.5 rounded-xl text-[10px] font-bold text-center uppercase tracking-widest border border-rose-100">
                                         {loginError}
                                     </div>
+                                )}
+
+                                {/* 🆕 Tombol retry SSO manual -- cuma muncul kalau halaman ini
+                                    dibuka lewat tiket SSO dari Hub (?sso=...) dan proses otomatis
+                                    tadi gagal (mis. sinyal lemah). Biar user gak perlu tutup
+                                    overlay & buka ulang dari Hub cuma buat coba lagi. */}
+                                {ssoTokenFromUrl && (
+                                    <button
+                                        type="button"
+                                        onClick={cobaSsoLagi}
+                                        disabled={retryingSso}
+                                        className="w-full mb-3 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest border border-emerald-200 bg-emerald-50 text-emerald-700 disabled:opacity-60 active:scale-[0.98] transition"
+                                    >
+                                        {retryingSso ? 'Menyambungkan...' : '🔄 Coba Sambungkan Lagi ke Hub'}
+                                    </button>
                                 )}
                                 
                                 <div className="flex flex-col gap-4">
