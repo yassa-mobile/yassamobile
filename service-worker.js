@@ -1,12 +1,12 @@
 // ============================================================
 // SERVICE WORKER - YASSA Mobile PWA
-// Versi: 1.1.39-AUTO-REFRESH-DATA
+// Versi: 1.1.40-SSO-RETRY-BUTTON
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "1.1.39-AUTO-REFRESH-DATA";
+const SW_VERSION = "1.1.40-SSO-RETRY-BUTTON";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
@@ -62,7 +62,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_NAME = 'yassa-cache-v8';
+const CACHE_NAME = 'yassa-cache-v9';
 
 const STATIC_ASSETS = [
   '/yassamobile/',
