@@ -3683,9 +3683,22 @@ const submitArchiveChildren = async () => {
                 setLoading("MENYIMPAN DATA...");
                 try {
                     const token = yassaStore.get('yassa-token') || '';
-                    
+
+                    // 🔒 Paksa field NIK tersimpan sebagai TEKS di Google Sheet (bukan angka),
+                    // supaya tidak dibulatkan/berubah jadi notasi ilmiah karena 16 digit.
+                    // Caranya: tambahkan tanda kutip satu (') otomatis di depan nilainya.
+                    const ensureNikQuote = (val) => {
+                        if (val === undefined || val === null) return val;
+                        const str = String(val).trim();
+                        if (str === '') return str;
+                        return str.startsWith("'") ? str : "'" + str;
+                    };
+
                     // 1. Persiapkan ID Keluarga
                     let familyData = { ...regFamily };
+                    ['NIK ALM', 'NIK IBU', 'NIK KK'].forEach(k => {
+                        if (familyData[k] !== undefined) familyData[k] = ensureNikQuote(familyData[k]);
+                    });
                     const familyOriginalSnapshot = familyData._original;
                     delete familyData._original;
                     if (regModal.mode === 'add') {
@@ -3719,6 +3732,7 @@ const submitArchiveChildren = async () => {
                     
                     for (let i = 0; i < regChildren.length; i++) {
                         let childData = { ...regChildren[i] };
+                        if (childData['NIK ANAK'] !== undefined) childData['NIK ANAK'] = ensureNikQuote(childData['NIK ANAK']);
                         const childOriginalSnapshot = childData._original;
                         delete childData._original;
                         childData['ID_Keluarga'] = familyData['ID_Keluarga'];
@@ -8497,25 +8511,35 @@ const submitArchiveChildren = async () => {
             <ArsipDokumenButtons arsip={arsipByKeluarga[norm(regFamily.ID_Keluarga)]} />
         </div>
     )}
-    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm ${(regModal.familyTab || 'profil') === 'arsip' ? 'hidden' : ''}`}>
-{typeof KELUARGA_FIELDS !== 'undefined' && KELUARGA_FIELDS.map(f => {
-    const fKey = f.key.toUpperCase();
-    
-    // Logika Pengelompokan Field ke dalam Tab
+    <div className={`space-y-1 bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm ${(regModal.familyTab || 'profil') === 'arsip' ? 'hidden' : ''}`}>
+{(() => {
+    if (typeof KELUARGA_FIELDS === 'undefined') return null;
+
     const tabAktif = regModal.familyTab || 'profil';
-    const isRekening = ['REKENING', 'BANK', 'PEMILIK', 'KETERANGAN PEMILIK'].includes(fKey);
-    const isLainnya = ['WARNA KERTAS', 'PENANDAAN KERTAS', 'STATUS AKUN', 'SURAT RESIGN GOJEK', 'BPJS', 'TGL KIRIM DATA', 'EMAIL KORWIL'].includes(fKey);
-    
-    // Tampilkan hanya field yang sesuai dengan tab yang sedang aktif
-    if (tabAktif === 'profil' && (isRekening || isLainnya)) return null;
-    if (tabAktif === 'rekening' && !isRekening) return null;
-    if (tabAktif === 'lainnya' && !isLainnya) return null;
-    if (tabAktif === 'arsip') return null;
 
-    // Sembunyikan field PENANDAAN KERTAS / WARNA KERTAS di Input Data Baru
-    if (f.key.toUpperCase() === 'WARNA KERTAS' || f.key.toUpperCase() === 'PENANDAAN KERTAS') return null;
+    // Field yang tetap disembunyikan permanen dari form (tidak dihapus dari data)
+    const HIDDEN_KEYS = ['WARNA KERTAS', 'PENANDAAN KERTAS'];
 
-return (
+    // Pengelompokan TAMPILAN & URUTAN per tab saja -- field dan syarat/validasi tidak diubah sama sekali
+    const TAB_GROUPS = {
+        profil: [
+            { title: 'Wilayah & Data Almarhum', keys: ['WILAYAH', 'NAMA ALM', 'NIK ALM', 'TGL MENINGGAL', 'SEBAB'] },
+            { title: 'Data Ibu / Wali', keys: ['NAMA IBU', 'NIK IBU', 'KATAGORI ISTRI', 'PROFESI'] },
+            { title: 'Kontak & Domisili', keys: ['NO GOJEK', 'NO TELEPON', 'EMAIL', 'ALAMAT', 'DOMISILI'] },
+            { title: 'Kartu Keluarga', keys: ['JUMLAH ANAK', 'NIK KK'] },
+        ],
+        rekening: [
+            { title: null, keys: ['BANK', 'REKENING', 'PEMILIK', 'KETERANGAN PEMILIK'] },
+        ],
+        lainnya: [
+            { title: 'Status', keys: ['STATUS AKUN', 'BPJS'] },
+            { title: 'Administrasi', keys: ['SURAT RESIGN GOJEK', 'TGL KIRIM DATA', 'EMAIL KORWIL'] },
+        ],
+    };
+
+    const groups = TAB_GROUPS[tabAktif] || [];
+
+    const renderKeluargaField = (f) => (
 <div key={f.key} className={f.type === 'textarea' ? "sm:col-span-2" : ""}>
                                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">{f.label}</label>
                                                     {f.key === 'BANK' ? (
@@ -8580,8 +8604,51 @@ return (
 />
 )}
 </div>
-);
-})}
+    );
+
+    // Jaring pengaman: field lama yang belum masuk daftar kelompok tetap tampil di akhir
+    const groupedKeys = groups.flatMap(g => g.keys.map(k => k.toUpperCase()));
+    const isKnownField = (fKeyUpper) => {
+        if (tabAktif === 'profil') return !['REKENING', 'BANK', 'PEMILIK', 'KETERANGAN PEMILIK', 'WARNA KERTAS', 'PENANDAAN KERTAS', 'STATUS AKUN', 'SURAT RESIGN GOJEK', 'BPJS', 'TGL KIRIM DATA', 'EMAIL KORWIL'].includes(fKeyUpper);
+        if (tabAktif === 'rekening') return ['REKENING', 'BANK', 'PEMILIK', 'KETERANGAN PEMILIK'].includes(fKeyUpper);
+        if (tabAktif === 'lainnya') return ['WARNA KERTAS', 'PENANDAAN KERTAS', 'STATUS AKUN', 'SURAT RESIGN GOJEK', 'BPJS', 'TGL KIRIM DATA', 'EMAIL KORWIL'].includes(fKeyUpper);
+        return false;
+    };
+    const sisaFields = tabAktif === 'arsip' ? [] : KELUARGA_FIELDS.filter(f => {
+        const fk = f.key.toUpperCase();
+        if (HIDDEN_KEYS.includes(fk)) return false;
+        if (!isKnownField(fk)) return false;
+        return !groupedKeys.includes(fk);
+    });
+
+    return (
+        <>
+            {groups.map((group, gi) => {
+                const fieldsInGroup = group.keys
+                    .map(k => KELUARGA_FIELDS.find(ff => ff.key.toUpperCase() === k.toUpperCase()))
+                    .filter(f => f && !HIDDEN_KEYS.includes(f.key.toUpperCase()));
+                if (fieldsInGroup.length === 0) return null;
+                return (
+                    <div key={group.title || ('grp' + gi)} className={gi > 0 ? "pt-5 mt-4 border-t border-slate-200" : ""}>
+                        {group.title && (
+                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-3">{group.title}</p>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                            {fieldsInGroup.map(renderKeluargaField)}
+                        </div>
+                    </div>
+                );
+            })}
+            {sisaFields.length > 0 && (
+                <div className="pt-5 mt-4 border-t border-slate-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                        {sisaFields.map(renderKeluargaField)}
+                    </div>
+                </div>
+            )}
+        </>
+    );
+})()}
 </div>
 </div>
 )}
@@ -8641,76 +8708,119 @@ return (
                                                         </div>
 
                                                         {/* Area Form Anak */}
-                                                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-                                                            {typeof ANAK_FIELDS !== 'undefined' && ANAK_FIELDS.map(f => {
-                                                                if (f.key === 'FOTO ANAK') return null;
+                                                        <div className="flex-1 space-y-4">
+                                                            {(() => {
+                                                                if (typeof ANAK_FIELDS === 'undefined') return null;
 
-                                                                // Logika Filter Field SAPA (Dinamic Hiding)
+                                                                // Pengelompokan TAMPILAN & URUTAN saja untuk merapikan form -- field dan syarat/validasi tidak diubah sama sekali
+                                                                const ANAK_GROUPS = [
+                                                                    { title: 'Identitas Anak', keys: ['NAMA ANAK', 'NIK ANAK', 'Jenis kelamin', 'TANGGAL LAHIR', 'AGAMA'] },
+                                                                    { title: 'Pendidikan', keys: ['JENJANG SEKOLAH', 'NAMA SEKOLAH', 'KELAS', 'SEKOLAH'] },
+                                                                    { title: 'Status & Kondisi', keys: ['YATIM', 'YATIM PIATU', 'DISABILITAS', 'JENIS DISABILITAS'] },
+                                                                    { title: 'Program Bantuan', keys: ['PROGRAM', 'NAMA ORANG TUA ASUH', 'AKTIF SANTUNAN GOPAY', 'MULAI SANTUNAN SAPA', 'BERAKHIR SANTUNAN SAPA', 'SANTUNAN SAPA'] },
+                                                                ];
+
                                                                 const sapaFields = ['NAMA ORANG TUA ASUH', 'MULAI SANTUNAN SAPA', 'BERAKHIR SANTUNAN SAPA', 'SANTUNAN SAPA', 'JUMLAH SANTUNAN SAPA'];
                                                                 const currentProgram = (child['PROGRAM'] || '').toUpperCase();
-                                                                
-                                                                // Jika field termasuk field SAPA dan program BUKAN SAPA, sembunyikan form tersebut
-                                                                if (sapaFields.includes(f.key.toUpperCase()) && !currentProgram.includes('SAPA')) {
-                                                                    return null;
-                                                                }
-
-                                                                // 🏥 [BARU] "Jenis Disabilitas" hanya muncul kalau status Disabilitas = DISABILITAS
                                                                 const currentDisabilitas = (child['DISABILITAS'] || '').toUpperCase();
-                                                                if (f.key.toUpperCase() === 'JENIS DISABILITAS' && currentDisabilitas !== 'DISABILITAS') {
-                                                                    return null;
-                                                                }
+
+                                                                const renderAnakField = (f) => {
+                                                                    if (f.key === 'FOTO ANAK') return null;
+
+                                                                    // Logika Filter Field SAPA (Dinamic Hiding)
+                                                                    if (sapaFields.includes(f.key.toUpperCase()) && !currentProgram.includes('SAPA')) {
+                                                                        return null;
+                                                                    }
+
+                                                                    // 🏥 "Jenis Disabilitas" hanya muncul kalau status Disabilitas = DISABILITAS
+                                                                    if (f.key.toUpperCase() === 'JENIS DISABILITAS' && currentDisabilitas !== 'DISABILITAS') {
+                                                                        return null;
+                                                                    }
+
+                                                                    return (
+                                                                        <div key={f.key} className={f.type === 'textarea' ? "sm:col-span-2" : ""}>
+                                                                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">{f.label}</label>
+                                                                            {f.type === 'select' ? (
+                                                                                <select
+                                                                                    value={child[f.key] || ''}
+                                                                                    onChange={e => {
+                                                                                        const nc = [...regChildren];
+                                                                                        nc[i] = { ...nc[i], [f.key]: e.target.value.toUpperCase() };
+                                                                                        setRegChildren(nc);
+                                                                                    }}
+                                                                                    disabled={regModal.mode === 'view'}
+                                                                                    className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 shadow-sm transition-all disabled:opacity-50"
+                                                                                >
+                                                                                    <option value="">-- Pilih --</option>
+                                                                                    {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                                                                                </select>
+                                                                            ) : (
+                                                                                <input
+                                                                                    // PERUBAHAN: Tipe input khusus NIK ANAK diubah ke text
+                                                                                    type={f.key === 'AKTIF SANTUNAN GOPAY' ? 'month' : (f.key === 'SANTUNAN SAPA' || f.key === 'JUMLAH SANTUNAN SAPA' ? 'tel' : (f.key === 'NIK ANAK' ? 'text' : f.type))}
+                                                                                    inputMode={f.key === 'SANTUNAN SAPA' || f.key === 'JUMLAH SANTUNAN SAPA' ? 'numeric' : undefined}
+                                                                                    value={child[f.key] || ''}
+                                                                                    onChange={e => {
+                                                                                        let val = e.target.value;
+                                                                                        if (f.key.toUpperCase().includes('EMAIL')) {
+                                                                                            val = val.toLowerCase();
+                                                                                        } else if (f.key !== 'AKTIF SANTUNAN GOPAY') {
+                                                                                            val = val.toUpperCase();
+                                                                                        }
+
+                                                                                        // PERUBAHAN: Memaksa HANYA ANGKA, kecuali NIK ANAK diizinkan kutip (')
+                                                                                        if (f.key === 'NIK ANAK' || f.key === 'SANTUNAN SAPA' || f.key === 'JUMLAH SANTUNAN SAPA') {
+                                                                                            if (f.key === 'NIK ANAK') {
+                                                                                                val = val.replace(/[^0-9']/g, '');
+                                                                                            } else {
+                                                                                                val = val.replace(/[^0-9]/g, '');
+                                                                                            }
+                                                                                        }
+                                                                                        const nc = [...regChildren];
+                                                                                        nc[i] = { ...nc[i], [f.key]: val };
+                                                                                        setRegChildren(nc);
+                                                                                    }}
+                                                                                    disabled={regModal.mode === 'view'}
+                                                                                    placeholder={`Masukkan ${f.label.toLowerCase()}`}
+                                                                                    className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 shadow-sm transition-all disabled:opacity-50"
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                };
+
+                                                                // Jaring pengaman: field lama yang belum masuk daftar kelompok tetap tampil di akhir
+                                                                const groupedKeys = ANAK_GROUPS.flatMap(g => g.keys.map(k => k.toUpperCase()));
+                                                                const sisaFields = ANAK_FIELDS.filter(f => !groupedKeys.includes(f.key.toUpperCase()) && f.key !== 'FOTO ANAK');
 
                                                                 return (
-                                                                    <div key={f.key} className={f.type === 'textarea' ? "sm:col-span-2" : ""}>
-                                                                        <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">{f.label}</label>
-                                                                        {f.type === 'select' ? (
-                                                                            <select
-                                                                                value={child[f.key] || ''}
-                                                                                onChange={e => {
-                                                                                    const nc = [...regChildren];
-                                                                                    nc[i] = { ...nc[i], [f.key]: e.target.value.toUpperCase() };
-                                                                                    setRegChildren(nc);
-                                                                                }}
-                                                                                disabled={regModal.mode === 'view'}
-                                                                                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 shadow-sm transition-all disabled:opacity-50"
-                                                                            >
-                                                                                <option value="">-- Pilih --</option>
-                                                                                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                                                                            </select>
-                                                                        ) : (
-                                                                            <input
-                                                                                // PERUBAHAN: Tipe input khusus NIK ANAK diubah ke text
-                                                                                type={f.key === 'AKTIF SANTUNAN GOPAY' ? 'month' : (f.key === 'SANTUNAN SAPA' || f.key === 'JUMLAH SANTUNAN SAPA' ? 'tel' : (f.key === 'NIK ANAK' ? 'text' : f.type))}
-                                                                                inputMode={f.key === 'SANTUNAN SAPA' || f.key === 'JUMLAH SANTUNAN SAPA' ? 'numeric' : undefined}
-                                                                                value={child[f.key] || ''}
-                                                                                onChange={e => {
-                                                                                    let val = e.target.value;
-                                                                                    if (f.key.toUpperCase().includes('EMAIL')) {
-                                                                                        val = val.toLowerCase();
-                                                                                    } else if (f.key !== 'AKTIF SANTUNAN GOPAY') {
-                                                                                        val = val.toUpperCase();
-                                                                                    }
-
-                                                                                    // PERUBAHAN: Memaksa HANYA ANGKA, kecuali NIK ANAK diizinkan kutip (')
-                                                                                    if (f.key === 'NIK ANAK' || f.key === 'SANTUNAN SAPA' || f.key === 'JUMLAH SANTUNAN SAPA') {
-                                                                                        if (f.key === 'NIK ANAK') {
-                                                                                            val = val.replace(/[^0-9']/g, '');
-                                                                                        } else {
-                                                                                            val = val.replace(/[^0-9]/g, '');
-                                                                                        }
-                                                                                    }
-                                                                                    const nc = [...regChildren];
-                                                                                    nc[i] = { ...nc[i], [f.key]: val };
-                                                                                    setRegChildren(nc);
-                                                                                }}
-                                                                                disabled={regModal.mode === 'view'}
-                                                                                placeholder={`Masukkan ${f.label.toLowerCase()}`}
-                                                                                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 shadow-sm transition-all disabled:opacity-50"
-                                                                            />
+                                                                    <>
+                                                                        {ANAK_GROUPS.map((group, gi) => {
+                                                                            const fieldsInGroup = group.keys
+                                                                                .map(k => ANAK_FIELDS.find(ff => ff.key.toUpperCase() === k.toUpperCase()))
+                                                                                .filter(Boolean)
+                                                                                .map(renderAnakField)
+                                                                                .filter(Boolean);
+                                                                            if (fieldsInGroup.length === 0) return null;
+                                                                            return (
+                                                                                <div key={group.title} className={gi > 0 ? "pt-4 border-t border-slate-200" : ""}>
+                                                                                    <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">{group.title}</p>
+                                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+                                                                                        {fieldsInGroup}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                        {sisaFields.length > 0 && (
+                                                                            <div className="pt-4 border-t border-slate-200">
+                                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+                                                                                    {sisaFields.map(renderAnakField)}
+                                                                                </div>
+                                                                            </div>
                                                                         )}
-                                                                    </div>
+                                                                    </>
                                                                 );
-                                                            })}
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </div>
