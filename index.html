@@ -97,6 +97,21 @@
     @media print {
         body.dark-mode { filter: none !important; }
     }
+
+    /* ============================================================ */
+    /* FIX TOMBOL/NAV KEPOTONG DI HP (BUG 100VH BROWSER MOBILE)      */
+    /* Di Chrome/Android, 1 00vh (dipakai lewat class h-screen)      */
+    /* dihitung TERMASUK area address bar, jadi lebih tinggi dari    */
+    /* layar yang beneran kelihatan. Akibatnya elemen yang nempel di */
+    /* bawah (nav bar "Kontrol" & tombol SELANJUTNYA/SIMPAN di form) */
+    /* jadi tampak turun/kepotong. 100dvh selalu mengikuti tinggi    */
+    /* layar yang beneran terlihat saat itu, jadi dipakai kalau      */
+    /* browsernya mendukung (fallback tetap 100vh kalau tidak).      */
+    /* ============================================================ */
+    @supports (height: 100dvh) {
+        .h-screen { height: 100dvh !important; }
+        .min-h-screen { min-height: 100dvh !important; }
+    }
 </style>
 <script>
 // ============================================================
