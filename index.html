@@ -2221,11 +2221,6 @@ const submitArchiveChildren = async () => {
             // anak formnya punya accordion sendiri-sendiri.
             const [openProfilGroup, setOpenProfilGroup] = useState(0);
             const [openAnakGroup, setOpenAnakGroup] = useState({});
-            // Setiap kali modal registrasi dibuka (dari kondisi tertutup), reset accordion
-            // supaya selalu mulai dari kelompok pertama lagi -- form manapun yang dibuka.
-            React.useEffect(() => {
-                if (regModal.open) { setOpenProfilGroup(0); setOpenAnakGroup({}); }
-            }, [regModal.open]);
             const [errorMsg, setErrorMsg] = useState('');
             const [uploadingImageIdx, setUploadingImageIdx] = useState(null);
 
@@ -3698,10 +3693,16 @@ const submitArchiveChildren = async () => {
             };
 
             const openEditFamily = (f, startTab) => {
+                // 🆕 Tab family sekarang cuma 'input' (gabungan Profil/Rekening/Lainnya) & 'arsip'.
+                // startTab lama ('profil'/'rekening') dipakai buat nentuin kelompok accordion
+                // mana yang langsung dibuka duluan, bukan tab yang berbeda lagi.
+                const GROUP_INDEX_BY_STARTTAB = { profil: 0, rekening: 4 };
+                setOpenProfilGroup(startTab in GROUP_INDEX_BY_STARTTAB ? GROUP_INDEX_BY_STARTTAB[startTab] : 0);
+                setOpenAnakGroup({});
                 // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
                 if (role !== 'admin') {
                     setRegFamily(f);
-                    setRegModal({ open: true, step: 1, mode: 'view', familyTab: startTab }); setErrorMsg('');
+                    setRegModal({ open: true, step: 1, mode: 'view', familyTab: 'input' }); setErrorMsg('');
                     return;
                 }
                 // 🆕 Simpan snapshot data ASLI saat form dibuka (untuk deteksi konflik
@@ -3711,10 +3712,12 @@ const submitArchiveChildren = async () => {
                 setRegFamily({ ...f, _original: { ...f } });
                 const relatedChildren = anakByKeluargaMap[norm(getVal(f, 'ID_Keluarga'))] || [];
                 setRegChildren(relatedChildren.length > 0 ? relatedChildren.map(c => ({ ...c, _original: { ...c } })) : []);
-                setRegModal({ open: true, step: 1, mode: 'edit', familyTab: startTab }); setErrorMsg('');
+                setRegModal({ open: true, step: 1, mode: 'edit', familyTab: 'input' }); setErrorMsg('');
             };
 
             const openEditChild = (c) => {
+                // 🆕 Reset accordion form Anak biar mulai dari kelompok pertama
+                setOpenAnakGroup({});
                 // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
                 if (role !== 'admin') {
                     setRegChildren([c]); setRegModal({ open: true, step: 2, mode: 'view' }); setErrorMsg('');
@@ -4597,7 +4600,7 @@ const submitArchiveChildren = async () => {
                         <div className="flex gap-2">
                              <button onClick={toggleDarkMode} className="p-3 bg-slate-50 rounded-2xl transition-all text-slate-400" title={darkMode ? 'Mode Standar' : 'Mode Malam'}><Icon name={darkMode ? 'sun' : 'moon'} size={18} /></button>
                              <button onClick={refresh} className={`p-3 bg-slate-50 rounded-2xl transition-all ${loading ? "animate-spin text-green-600" : "text-slate-400"}`}><Icon name="refresh-cw" size={18} /></button>
-                             {role === 'admin' && <button onClick={() => { setRegFamily({}); setRegChildren([]); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }} className="p-3 bg-green-600 text-white rounded-2xl shadow-lg btn-active transition-all"><Icon name="plus-circle" size={18} /></button>}
+                             {role === 'admin' && <button onClick={() => { setRegFamily({}); setRegChildren([]); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }} className="p-3 bg-green-600 text-white rounded-2xl shadow-lg btn-active transition-all"><Icon name="plus-circle" size={18} /></button>}
                         </div>
                     </header>
                     )}
@@ -5080,7 +5083,7 @@ const submitArchiveChildren = async () => {
 
                                 {role === 'admin' && (
                                     <button
-                                        onClick={() => { setRegFamily({}); setRegChildren([]); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }}
+                                        onClick={() => { setRegFamily({}); setRegChildren([]); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }}
                                         className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all p-6 flex items-center gap-5 text-left"
                                     >
                                         <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
@@ -5513,7 +5516,7 @@ const submitArchiveChildren = async () => {
                                                         {role === 'admin' ? (
                                                             <button onClick={() => openEditFamily(item)} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-slate-500 hover:text-green-600 active:scale-95 transition-all outline-none"><Icon name="edit" size={16} /></button>
                                                         ) : (
-                                                            <button onClick={() => { setRegFamily(item); setRegModal({ open: true, step: 1, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-blue-500 hover:text-blue-600 active:scale-95 transition-all outline-none"><Icon name="eye" size={16} /></button>
+                                                            <button onClick={() => { setRegFamily(item); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-blue-500 hover:text-blue-600 active:scale-95 transition-all outline-none"><Icon name="eye" size={16} /></button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -5573,7 +5576,7 @@ const submitArchiveChildren = async () => {
                                                         {role === 'admin' ? (
                                                             <button onClick={() => openEditFamily(item)} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-green-600'}`}><Icon name="edit" size={14} /></button>
                                                         ) : (
-                                                            <button onClick={() => { setRegFamily(item); setRegModal({ open: true, step: 1, mode: 'view' }); }} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-blue-50 border-blue-100 text-blue-500 hover:bg-blue-100'}`}><Icon name="eye" size={14} /></button>
+                                                            <button onClick={() => { setRegFamily(item); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'view' }); }} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-blue-50 border-blue-100 text-blue-500 hover:bg-blue-100'}`}><Icon name="eye" size={14} /></button>
                                                         )}
                                                     </div>
 
@@ -7060,7 +7063,7 @@ const submitArchiveChildren = async () => {
                                                     {role === 'admin' ? (
                                                         <button onClick={() => openEditChild(item)} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-slate-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] active:text-green-600 transition-all"><Icon name="edit" size={16} /></button>
                                                     ) : (
-                                                        <button onClick={() => { setRegChildren([item]); setRegModal({ open: true, step: 2, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-blue-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="eye" size={16} /></button>
+                                                        <button onClick={() => { setOpenAnakGroup({}); setRegChildren([item]); setRegModal({ open: true, step: 2, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-blue-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="eye" size={16} /></button>
                                                     )}
                                                     {role === 'admin' && (
                                                         <button onClick={() => openAddPrestasi(item)} title="Tambah Prestasi" className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-amber-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="award" size={16} /></button>
@@ -8548,22 +8551,12 @@ const submitArchiveChildren = async () => {
 
                                     {regModal.step === 1 && (
 <div className="space-y-5">
-    {/* TAB KHUSUS DATA KELUARGA (PROFIL, REKENING, LAINNYA) */}
+    {/* TAB DATA KELUARGA: cuma 2 -- Input Data (gabungan Profil/Rekening/Lainnya) & Arsip Dokumen */}
     <div className="flex bg-[#E0E5EC] p-1.5 rounded-[1.5rem] shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] overflow-x-auto no-scrollbar border-none">
         <button 
-            onClick={() => { setRegModal({...regModal, familyTab: 'profil'}); setOpenProfilGroup(0); }} 
-            className={`flex-1 py-3 px-4 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${(!regModal.familyTab || regModal.familyTab === 'profil') ? 'bg-white text-emerald-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>
-            👤 Profil Keluarga
-        </button>
-        <button 
-            onClick={() => { setRegModal({...regModal, familyTab: 'rekening'}); setOpenProfilGroup(0); }} 
-            className={`flex-1 py-3 px-4 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${regModal.familyTab === 'rekening' ? 'bg-white text-blue-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>
-            💳 Data Rekening
-        </button>
-        <button 
-            onClick={() => { setRegModal({...regModal, familyTab: 'lainnya'}); setOpenProfilGroup(0); }} 
-            className={`flex-1 py-3 px-4 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${regModal.familyTab === 'lainnya' ? 'bg-white text-amber-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>
-            📋 Info Lainnya
+            onClick={() => { setRegModal({...regModal, familyTab: 'input'}); setOpenProfilGroup(0); }} 
+            className={`flex-1 py-3 px-4 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 outline-none ${(!regModal.familyTab || regModal.familyTab === 'input') ? 'bg-white text-emerald-600 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'text-slate-400 hover:text-slate-600'}`}>
+            📝 Input Data
         </button>
         <button 
             onClick={() => { setRegModal({...regModal, familyTab: 'arsip'}); setOpenProfilGroup(0); }} 
@@ -8572,7 +8565,7 @@ const submitArchiveChildren = async () => {
         </button>
     </div>
 
-    {(regModal.familyTab || 'profil') === 'arsip' && (
+    {(regModal.familyTab || 'input') === 'arsip' && (
         <div className="bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm">
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4 text-center">
                 Data arsip diisi/diubah langsung di Google Sheet "Manajemen_Arsip"
@@ -8580,28 +8573,26 @@ const submitArchiveChildren = async () => {
             <ArsipDokumenButtons arsip={arsipByKeluarga[norm(regFamily.ID_Keluarga)]} />
         </div>
     )}
-    <div className={`space-y-1 bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm ${(regModal.familyTab || 'profil') === 'arsip' ? 'hidden' : ''}`}>
+    <div className={`space-y-1 bg-slate-50 border border-slate-200 p-4 sm:p-6 rounded-[2rem] shadow-sm ${(regModal.familyTab || 'input') === 'arsip' ? 'hidden' : ''}`}>
 {(() => {
     if (typeof KELUARGA_FIELDS === 'undefined') return null;
 
-    const tabAktif = regModal.familyTab || 'profil';
+    const tabAktif = regModal.familyTab || 'input';
 
     // Field yang tetap disembunyikan permanen dari form (tidak dihapus dari data)
     const HIDDEN_KEYS = ['WARNA KERTAS', 'PENANDAAN KERTAS'];
 
-    // Pengelompokan TAMPILAN & URUTAN per tab saja -- field dan syarat/validasi tidak diubah sama sekali
+    // Pengelompokan TAMPILAN & URUTAN saja (Profil Keluarga + Data Rekening + Info Lainnya
+    // digabung jadi satu alur "Input Data" yang berurutan) -- field dan syarat/validasi
+    // tidak diubah sama sekali, ini murni tampilan.
     const TAB_GROUPS = {
-        profil: [
+        input: [
             { title: 'Wilayah & Data Almarhum', keys: ['WILAYAH', 'NAMA ALM', 'NIK ALM', 'TGL MENINGGAL', 'SEBAB'] },
             { title: 'Data Ibu / Wali', keys: ['NAMA IBU', 'NIK IBU', 'KATAGORI ISTRI', 'PROFESI'] },
             { title: 'Kontak & Domisili', keys: ['NO GOJEK', 'NO TELEPON', 'EMAIL', 'ALAMAT', 'DOMISILI'] },
             { title: 'Kartu Keluarga', keys: ['JUMLAH ANAK', 'NIK KK'] },
-        ],
-        rekening: [
-            { title: null, keys: ['BANK', 'REKENING', 'PEMILIK', 'KETERANGAN PEMILIK'] },
-        ],
-        lainnya: [
-            { title: 'Status', keys: ['STATUS AKUN', 'BPJS'] },
+            { title: 'Data Rekening', keys: ['BANK', 'REKENING', 'PEMILIK', 'KETERANGAN PEMILIK'] },
+            { title: 'Status Akun & BPJS', keys: ['STATUS AKUN', 'BPJS'] },
             { title: 'Administrasi', keys: ['SURAT RESIGN GOJEK', 'TGL KIRIM DATA', 'EMAIL KORWIL'] },
         ],
     };
@@ -8677,16 +8668,9 @@ const submitArchiveChildren = async () => {
 
     // Jaring pengaman: field lama yang belum masuk daftar kelompok tetap tampil di akhir
     const groupedKeys = groups.flatMap(g => g.keys.map(k => k.toUpperCase()));
-    const isKnownField = (fKeyUpper) => {
-        if (tabAktif === 'profil') return !['REKENING', 'BANK', 'PEMILIK', 'KETERANGAN PEMILIK', 'WARNA KERTAS', 'PENANDAAN KERTAS', 'STATUS AKUN', 'SURAT RESIGN GOJEK', 'BPJS', 'TGL KIRIM DATA', 'EMAIL KORWIL'].includes(fKeyUpper);
-        if (tabAktif === 'rekening') return ['REKENING', 'BANK', 'PEMILIK', 'KETERANGAN PEMILIK'].includes(fKeyUpper);
-        if (tabAktif === 'lainnya') return ['WARNA KERTAS', 'PENANDAAN KERTAS', 'STATUS AKUN', 'SURAT RESIGN GOJEK', 'BPJS', 'TGL KIRIM DATA', 'EMAIL KORWIL'].includes(fKeyUpper);
-        return false;
-    };
     const sisaFields = tabAktif === 'arsip' ? [] : KELUARGA_FIELDS.filter(f => {
         const fk = f.key.toUpperCase();
         if (HIDDEN_KEYS.includes(fk)) return false;
-        if (!isKnownField(fk)) return false;
         return !groupedKeys.includes(fk);
     });
 
