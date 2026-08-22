@@ -1965,6 +1965,8 @@ const submitArchiveChildren = async () => {
             }, [searchInput]);
             const [filterWilayah, setFilterWilayah] = useState(''); 
             const [filterProgram, setFilterProgram] = useState(''); 
+            // 🆕 Filter cepat buat lihat keluarga (kel. Alm) yang datanya BELUM ADA rekening bank
+            const [filterNoRekening, setFilterNoRekening] = useState(false);
             const [filterKategoriAnak, setFilterKategoriAnak] = useState('');
             const [filterOta, setFilterOta] = useState(''); // ✅ STATE BARU UNTUK FILTER OTA
             
@@ -3352,8 +3354,15 @@ const submitArchiveChildren = async () => {
                         return matchKeluarga || matchAnak;
                     });
                 }
+
+                // 🆕 Filter "Belum Ada Rekening": keluarga dianggap belum punya rekening kalau
+                // No Rekening & Nama Bank dua-duanya masih kosong.
+                if (filterNoRekening) {
+                    result = result.filter(f => !(getVal(f, 'REKENING') || '').trim() && !(getVal(f, 'BANK') || '').trim());
+                }
+
                 return result;
-            }, [data.keluarga, data.anak, searchQuery, filterWilayah, filterProgram, role, allowedRegions]);
+            }, [data.keluarga, data.anak, searchQuery, filterWilayah, filterProgram, filterNoRekening, role, allowedRegions]);
 
             // 🆕 EXPORT DATA KK & DATA ANAK KE EXCEL (.xlsx) — Menghormati Filter Wilayah/Program yang aktif
             const handleExportExcel = useCallback(() => {
@@ -5351,6 +5360,16 @@ const submitArchiveChildren = async () => {
                                             </div>
                                         </div>
 
+                                        {/* 🆕 Row 1b: Filter cepat "Belum Ada Rekening" */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setFilterNoRekening(!filterNoRekening)}
+                                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all w-full ${filterNoRekening ? 'bg-rose-600 text-white shadow-lg' : 'bg-[#E0E5EC] text-rose-500 shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] hover:brightness-95'}`}
+                                        >
+                                            <Icon name="alert-triangle" size={14} />
+                                            {filterNoRekening ? `Menampilkan ${filteredKeluarga.length} Keluarga Belum Ada Rekening` : 'Tampilkan Keluarga Belum Ada Rekening'}
+                                        </button>
+
                                         {/* Row 2 & 3: Advanced Print Options & Actions (Only in Detail View) */}
                                         {viewMode === 'detail' && (
                                             <div className="flex flex-col gap-4 mt-4 pt-5 border-t border-[#c8d0dc]">
@@ -5492,6 +5511,8 @@ const submitArchiveChildren = async () => {
                                             if (p.includes('GOPAY')) hasGopayFam = true;
                                             if (p.includes('SAPA') || p.includes('ASUH') || p.includes('OTA')) hasSapaFam = true;
                                         });
+                                        // 🆕 Tandai keluarga yang belum ada data rekening bank sama sekali
+                                        const belumAdaRekening = !(getVal(item, 'REKENING') || '').trim() && !(getVal(item, 'BANK') || '').trim();
 
                                         if (viewMode === 'list') {
                                             return (
@@ -5503,6 +5524,7 @@ const submitArchiveChildren = async () => {
                                                                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{getVal(item, 'WILAYAH')}</p>
                                                                 {hasGopayFam && <span className="text-[7px] bg-[#E0E5EC] text-blue-600 px-2 py-1 rounded-md border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-black uppercase">GOPAY</span>}
                                                                 {hasSapaFam && <span className="text-[7px] bg-[#E0E5EC] text-rose-500 px-2 py-1 rounded-md border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-black uppercase">SAPA</span>}
+                                                                {belumAdaRekening && <span className="text-[7px] bg-rose-600 text-white px-2 py-1 rounded-md border-none shadow-[2px_2px_4px_rgb(163,177,198,0.6),-2px_-2px_4px_rgba(255,255,255,0.8)] font-black uppercase">Belum Ada Rekening</span>}
                                                             </div>
                                                         </div>
                                                     </div>
