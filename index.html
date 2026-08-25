@@ -66,6 +66,13 @@
             print-color-adjust: exact !important;
             color-adjust: exact !important;
         }
+
+        /* 🆕 FIX: pastikan kartu KUNING/BIRU di Buku Induk tetap solid
+           (tidak ikut memudar) sekalipun class Tailwind arbitrary-nya
+           gagal ter-generate saat proses print/PDF. */
+        .print-bg-highlight-yellow { background-color: #fde68a !important; border-color: #d97706 !important; }
+        .print-bg-highlight-sky { background-color: #7dd3fc !important; border-color: #0284c7 !important; }
+        .print-bg-highlight-blue { background-color: #93c5fd !important; border-color: #2563eb !important; }
     }
     .print-only { display: none; }
 
@@ -370,6 +377,13 @@ const maskNamaPemilik = (namaRaw) => {
         .network-status-banner.show { transform: translateY(0); }
         .network-status-banner.offline { background: #DC2626; color: #fff; }
         .network-status-banner.online { background: #16A34A; color: #fff; }
+
+        /* 🆕 FIX: banner status jaringan ini di luar tree React jadi gak
+           kena class "no-print" biasa — paksa selalu hilang saat print/PDF,
+           supaya gak ikut nyangkut di hasil cetak Buku Induk. */
+        @media print {
+            .network-status-banner { display: none !important; }
+        }
     </style>
 </head>
 <body class="overflow-hidden text-slate-800">
@@ -2594,7 +2608,7 @@ const submitArchiveChildren = async () => {
             // Riwayat_Pemilihan_Santunan) untuk PERIODE yang sama dengan
             // yang lagi dicetak di Buku Induk:
             //   - Kalau REKENING-nya kosong  -> kertas KUNING (amplop tunai)
-            //   - Kalau REKENING-nya ADA     -> nama ALM ditandai BIRU
+            //   - Kalau REKENING-nya ADA     -> kertas PUTIH (transfer)
             // Manual toggle (klik tombol warna) tetap bisa override hasil auto ini.
             // ============================================================
             const BULAN_ID_MAP = {
@@ -2645,7 +2659,7 @@ const submitArchiveChildren = async () => {
                 data.keluarga.forEach(item => {
                     const famId = norm(getVal(item, 'ID_Keluarga'));
                     if (!idsPeriodeIni.has(famId)) return;
-                    map[famId] = isRekeningKosongFE(getVal(item, 'REKENING')) ? 'KUNING' : 'BIRU';
+                    map[famId] = isRekeningKosongFE(getVal(item, 'REKENING')) ? 'KUNING' : 'PUTIH';
                 });
                 return map;
             }, [printMonthInput, data.riwayatAmplop, data.keluarga]);
@@ -5580,7 +5594,7 @@ const submitArchiveChildren = async () => {
                                             
                                             const hasGopayCalculation = gopayTotalAnak > 0 && baseNominal > 0;
 
-                                            const cardClasses = pColor === 'KUNING' ? 'bg-amber-50 border-amber-300 print-bg-highlight-yellow' : pColor === 'BIRU' ? 'bg-[#e0f2fe] border-[#7dd3fc] print-bg-highlight-sky' : isSelected ? 'bg-[#93c5fd] border-[#60a5fa] print-bg-highlight-blue' : 'bg-white border-slate-200';
+                                            const cardClasses = pColor === 'KUNING' ? 'bg-amber-100 border-amber-400 print-bg-highlight-yellow' : pColor === 'BIRU' ? 'bg-[#bae6fd] border-[#38bdf8] print-bg-highlight-sky' : isSelected ? 'bg-[#93c5fd] border-[#60a5fa] print-bg-highlight-blue' : 'bg-white border-slate-200';
                                             
                                             return (
                                                 <div key={i} className={`p-6 print:px-1.5 print:py-1 rounded-[2rem] print:rounded-lg border shadow-sm flex flex-col md:flex-row print:flex-row gap-6 print:gap-1.5 relative overflow-hidden print-card transition-colors break-inside-avoid page-break-inside-avoid ${cardClasses}`} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
