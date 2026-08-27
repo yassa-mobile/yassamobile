@@ -6957,6 +6957,13 @@ const submitArchiveChildren = async () => {
                                                                         <p><span className="font-bold">Sekolah</span>: {getVal(item, 'JENJANG SEKOLAH') || '-'} {getVal(item, 'KELAS') ? `Kls ${getVal(item, 'KELAS')}` : ''} - {getVal(item, 'NAMA SEKOLAH') || '-'}</p>
                                                                     </div>
                                                                 </div>
+                                                                <div className="w-[2.6cm] shrink-0 border-l border-slate-800 flex items-center justify-center p-1">
+                                                                    {getVal(item, 'FOTO ANAK') ? (
+                                                                        <img src={getVal(item, 'FOTO ANAK')} className="w-full h-[3.2cm] object-cover rounded-sm border border-slate-200" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                                    ) : (
+                                                                        <div className="w-full h-[3.2cm] bg-slate-50 rounded-sm border border-slate-200 flex items-center justify-center text-[6pt] text-slate-300 font-bold text-center p-1">NO FOTO</div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         );
                                                     })}
