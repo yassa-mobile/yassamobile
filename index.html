@@ -6856,6 +6856,90 @@ const submitArchiveChildren = async () => {
 
                                         return (
                                         <>
+                                    {filterProgram === 'SAPA' ? (
+                                    /* 🆕 TABEL BIODATA ala "DATA SANTUNAN ANAK ASUH" (format PDF bulanan) */
+                                    <table className="w-full border-collapse border border-slate-900 text-[8px]">
+                                        <thead style={{ display: 'table-header-group' }}>
+                                            <tr className="bg-slate-200" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                                <th rowSpan={2} className="border border-slate-900 p-1 w-5">No</th>
+                                                <th colSpan={2} className="border border-slate-900 p-1">Data Orang Tua Asuh</th>
+                                                <th colSpan={2} className="border border-slate-900 p-1">Data Orang Tua / Wali</th>
+                                                <th colSpan={2} className="border border-slate-900 p-1">Data Anak</th>
+                                                <th className="border border-slate-900 p-1 w-14">Foto</th>
+                                            </tr>
+                                        </thead>
+                                        {printAnakAsuhList.map((item, i) => {
+                                            const parent = familyLookupMap[norm(getVal(item, 'ID_Keluarga'))];
+                                            const namaAlm = parent ? getVal(parent, 'NAMA ALM') : 'TIDAK DIKETAHUI';
+                                            const namaIbu = parent ? getVal(parent, 'NAMA IBU') : '-';
+                                            const alamat = parent ? getVal(parent, 'ALAMAT') : '-';
+                                            const wilayah = parent ? getVal(parent, 'WILAYAH') : '-';
+
+                                            const statusSekolah = (getVal(item, 'SEKOLAH') || '').toUpperCase();
+                                            const isTidakSekolah = statusSekolah.includes('BELUM') || statusSekolah.includes('TIDAK');
+                                            const sekolahStr = isTidakSekolah ? 'BELUM / TIDAK SEKOLAH' : (getVal(item, 'NAMA SEKOLAH') || '-');
+
+                                            const otaNameItem = getVal(item, 'NAMA ORANG TUA ASUH') || '-';
+                                            const nominalSapaItem = String(getVal(item, 'SANTUNAN SAPA')).replace(/[^0-9]/g, '');
+                                            const mulaiSapaItem = getVal(item, 'MULAI SANTUNAN SAPA') || '-';
+                                            const akhirSapaItem = getVal(item, 'BERAKHIR SANTUNAN SAPA') || '-';
+                                            const pnItem = getVal(item, 'PN') || getVal(item, 'RIYANTO PN') || '-';
+
+                                            const yatimVal = (getVal(item, 'YATIM') || '').toUpperCase();
+                                            const piatuVal = (getVal(item, 'YATIM PIATU') || '').toUpperCase();
+                                            const disabilitasVal = (getVal(item, 'DISABILITAS') || '').toUpperCase();
+                                            let statusStr = [];
+                                            if (yatimVal.includes('YA') || yatimVal.includes('YATIM')) statusStr.push('YATIM');
+                                            if (piatuVal.includes('YA') || piatuVal.includes('PIATU')) statusStr.push('YATIM PIATU');
+                                            if (disabilitasVal.includes('YA') || disabilitasVal.includes('DISABILITAS')) statusStr.push('DISABILITAS');
+                                            statusStr = statusStr.length > 0 ? statusStr.join(' / ') : '-';
+
+                                            return (
+                                                <tbody key={i} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                                                    <tr>
+                                                        <td rowSpan={5} className="border border-slate-900 p-1 text-center align-top font-bold">{i + 1}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold w-14">Nama</td>
+                                                        <td className="border border-slate-900 p-1">{otaNameItem}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold w-16">Nama Alm</td>
+                                                        <td rowSpan={5} className="border border-slate-900 p-1 align-top">{namaAlm !== 'TIDAK DIKETAHUI' ? namaAlm : '-'}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold w-14">Nama Anak</td>
+                                                        <td rowSpan={2} className="border border-slate-900 p-1 align-top font-black uppercase">{getVal(item, 'NAMA ANAK')}</td>
+                                                        <td rowSpan={5} className="border border-slate-900 p-1 align-top w-14">
+                                                            {getVal(item, 'FOTO ANAK') ? (
+                                                                <img src={getVal(item, 'FOTO ANAK')} className="w-full h-[2.2cm] object-cover rounded" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                            ) : <div className="w-full h-[2.2cm] bg-slate-50 flex items-center justify-center text-slate-300">-</div>}
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="border border-slate-900 p-1 font-bold">Santunan</td>
+                                                        <td className="border border-slate-900 p-1 font-black">{nominalSapaItem ? `Rp ${parseInt(nominalSapaItem).toLocaleString('id-ID')}` : '-'}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold">Nama Ibu/Wali</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="border border-slate-900 p-1 font-bold">Aktif</td>
+                                                        <td className="border border-slate-900 p-1">{mulaiSapaItem} s/d {akhirSapaItem}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold">{namaIbu}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold">Status</td>
+                                                        <td className="border border-slate-900 p-1">{statusStr}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="border border-slate-900 p-1 font-bold">PN</td>
+                                                        <td className="border border-slate-900 p-1">{pnItem}</td>
+                                                        <td rowSpan={2} className="border border-slate-900 p-1 align-top">{alamat}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold">L/P, Lahir/Umur</td>
+                                                        <td className="border border-slate-900 p-1">{getVal(item, 'Jenis kelamin') || '-'} • {getVal(item, 'TANGGAL LAHIR') || '-'} {getVal(item, 'UMUR') ? `(${getVal(item, 'UMUR')} Thn)` : ''}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="border border-slate-900 p-1 font-bold">Wilayah</td>
+                                                        <td className="border border-slate-900 p-1">{wilayah}</td>
+                                                        <td className="border border-slate-900 p-1 font-bold">Sekolah</td>
+                                                        <td className="border border-slate-900 p-1">{getVal(item, 'JENJANG SEKOLAH') || ''} {getVal(item, 'KELAS') ? 'Kls '+getVal(item, 'KELAS') : ''} {sekolahStr !== '-' ? '- '+sekolahStr : sekolahStr}</td>
+                                                    </tr>
+                                                </tbody>
+                                            );
+                                        })}
+                                    </table>
+                                    ) : (
                                     <div className="grid grid-cols-2 gap-4">
                                         {printAnakAsuhList.map((item, i) => {
                                             const parent = familyLookupMap[norm(getVal(item, 'ID_Keluarga'))];
@@ -6873,13 +6957,6 @@ const submitArchiveChildren = async () => {
                                             const pendidikanStr = isTidakSekolah 
                                                 ? 'BELUM / TIDAK SEKOLAH' 
                                                 : `${getVal(item, 'JENJANG SEKOLAH') || ''} ${getVal(item, 'KELAS') ? 'KLS '+getVal(item, 'KELAS') : ''} ${getVal(item, 'NAMA SEKOLAH') ? '- '+getVal(item, 'NAMA SEKOLAH') : ''}`.trim();
-
-                                            // 🆕 Data khusus Anak Asuh (SAPA/OTA)
-                                            const progItem = (getVal(item, 'PROGRAM') || '').toLowerCase();
-                                            const isSapaItem = progItem.includes('sapa') || progItem.includes('asuh') || progItem.includes('ota');
-                                            const otaNameItem = getVal(item, 'NAMA ORANG TUA ASUH') || '-';
-                                            const nominalSapaItem = String(getVal(item, 'SANTUNAN SAPA')).replace(/[^0-9]/g, '');
-                                            const periodeSapaItem = `${getVal(item, 'MULAI SANTUNAN SAPA') || '-'} s/d ${getVal(item, 'BERAKHIR SANTUNAN SAPA') || '-'}`;
 
                                             return (
                                                 <div key={i} className="border border-slate-300 rounded-xl p-3 flex gap-3 shadow-sm break-inside-avoid page-break-inside-avoid">
@@ -6900,24 +6977,15 @@ const submitArchiveChildren = async () => {
                                                             <span className="font-bold">Nama Ibu</span><span>:</span><span className="uppercase font-bold text-slate-800">{namaIbu}</span>
                                                             <span className="font-bold">Wilayah</span><span>:</span><span className="uppercase">{wilayah}</span>
                                                             <span className="font-bold">Alamat</span><span>:</span><span className="leading-tight uppercase">{alamat}</span>
-                                                            {isSapaItem ? (
-                                                                <>
-                                                                    <span className="font-bold mt-1.5 text-emerald-700">Orang Tua Asuh</span><span className="mt-1.5 text-emerald-700">:</span><span className="mt-1.5 font-black text-emerald-800 uppercase">{otaNameItem}</span>
-                                                                    <span className="font-bold text-emerald-700">Santunan</span><span className="text-emerald-700">:</span><span className="text-emerald-800 font-black">{nominalSapaItem ? `Rp ${parseInt(nominalSapaItem).toLocaleString('id-ID')}` : '-'}</span>
-                                                                    <span className="font-bold text-slate-800">Periode Aktif</span><span className="text-slate-800">:</span><span className="text-slate-800 uppercase">{periodeSapaItem}</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <span className="font-bold mt-1.5 text-slate-800">Transfer</span><span className="mt-1.5 text-slate-800">:</span><span className="mt-1.5 font-black text-slate-900 uppercase">{bankParent} - {rekeningParent}</span>
-                                                                    <span className="font-bold text-slate-800">A/N</span><span className="text-slate-800">:</span><span className="text-slate-800 uppercase font-bold">{pemilikParent || '-'}</span>
-                                                                </>
-                                                            )}
+                                                            <span className="font-bold mt-1.5 text-slate-800">Transfer</span><span className="mt-1.5 text-slate-800">:</span><span className="mt-1.5 font-black text-slate-900 uppercase">{bankParent} - {rekeningParent}</span>
+                                                            <span className="font-bold text-slate-800">A/N</span><span className="text-slate-800">:</span><span className="text-slate-800 uppercase font-bold">{pemilikParent || '-'}</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                             );
                                         })}
                                     </div>
+                                    )}
 
                                     {/* 🆕 REKAP II: PENYERAHAN DONASI PER WILAYAH (khusus anak SAPA/OTA) */}
                                     {rekapWilayahRows.length > 0 && (
