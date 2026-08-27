@@ -6932,39 +6932,71 @@ const submitArchiveChildren = async () => {
                                                         ].filter(Boolean).join(' - ') || '-';
                                                         const nominal = parseSantunan(item);
 
+                                                        // Tanda tangan: Mengetahui = Ketua Umum (tetap), Diterima = Korwil sesuai wilayah anak (otomatis)
+                                                        const wilayahKeySign = (wilayah || '').trim().toUpperCase();
+                                                        const namaKorwilWilayah = (wilayahKeySign && pengurusMap[wilayahKeySign] && pengurusMap[wilayahKeySign].korwil !== '-')
+                                                            ? pengurusMap[wilayahKeySign].korwil
+                                                            : '( ........................ )';
+
                                                         return (
-                                                            <div key={i} className="flex gap-2 border border-slate-800 break-inside-avoid page-break-inside-avoid text-[8pt]">
-                                                                <div className="w-6 flex items-center justify-center border-r border-slate-800 font-black bg-slate-100">{i + 1}</div>
-                                                                <div className="flex-1 grid grid-cols-3 gap-x-3 p-2">
-                                                                    <div className="space-y-0.5">
-                                                                        <p className="font-black uppercase text-slate-500 text-[7pt] border-b border-slate-300 mb-1">Data Orang Tua Asuh</p>
-                                                                        <p><span className="font-bold">Nama</span>: {getVal(item, 'NAMA ORANG TUA ASUH') || '-'}</p>
-                                                                        <p><span className="font-bold">Santunan</span>: Rp {nominal.toLocaleString('id-ID')}</p>
-                                                                        <p><span className="font-bold">Periode Aktif</span>: {getVal(item, 'MULAI SANTUNAN SAPA') || '-'} s/d {getVal(item, 'BERAKHIR SANTUNAN SAPA') || '-'}</p>
-                                                                    </div>
-                                                                    <div className="space-y-0.5">
-                                                                        <p className="font-black uppercase text-slate-500 text-[7pt] border-b border-slate-300 mb-1">Data Orang Tua / Wali</p>
-                                                                        <p><span className="font-bold">Nama Alm</span>: {namaAlm}</p>
-                                                                        <p><span className="font-bold">Nama Ibu/Wali</span>: {namaIbu}</p>
-                                                                        <p><span className="font-bold">Wilayah</span>: {wilayah}</p>
-                                                                        <p className="leading-tight"><span className="font-bold">Alamat</span>: {alamat}</p>
-                                                                    </div>
-                                                                    <div className="space-y-0.5">
-                                                                        <p className="font-black uppercase text-slate-500 text-[7pt] border-b border-slate-300 mb-1">Data Anak</p>
-                                                                        <p className="font-black text-[9pt] uppercase">{getVal(item, 'NAMA ANAK')}</p>
-                                                                        <p><span className="font-bold">Status</span>: {statusAnak}</p>
-                                                                        <p><span className="font-bold">JK</span>: {getVal(item, 'Jenis kelamin') || '-'} • <span className="font-bold">Lahir</span>: {getVal(item, 'TANGGAL LAHIR') || '-'}</p>
-                                                                        <p><span className="font-bold">Sekolah</span>: {getVal(item, 'JENJANG SEKOLAH') || '-'} {getVal(item, 'KELAS') ? `Kls ${getVal(item, 'KELAS')}` : ''} - {getVal(item, 'NAMA SEKOLAH') || '-'}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="w-[2.6cm] shrink-0 border-l border-slate-800 flex items-center justify-center p-1">
-                                                                    {getVal(item, 'FOTO ANAK') ? (
-                                                                        <img src={getVal(item, 'FOTO ANAK')} className="w-full h-[3.2cm] object-cover rounded-sm border border-slate-200" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
-                                                                    ) : (
-                                                                        <div className="w-full h-[3.2cm] bg-slate-50 rounded-sm border border-slate-200 flex items-center justify-center text-[6pt] text-slate-300 font-bold text-center p-1">NO FOTO</div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                                            <table key={i} className="w-full border-collapse border border-slate-800 text-[7.5pt] break-inside-avoid page-break-inside-avoid">
+                                                                <tbody>
+                                                                    <tr>
+                                                                        <td rowSpan={7} className="border border-slate-800 w-6 text-center font-black bg-slate-100 align-middle">{i + 1}</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Orang Tua Asuh</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Orang Tua / Wali</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Anak</td>
+                                                                        <td rowSpan={7} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center">
+                                                                            {getVal(item, 'FOTO ANAK') ? (
+                                                                                <img src={getVal(item, 'FOTO ANAK')} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                                            ) : (
+                                                                                <div className="w-full h-[3.2cm] bg-slate-50 flex items-center justify-center text-[6pt] text-slate-300 font-bold text-center p-1">NO FOTO</div>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td className="border border-slate-800 p-1 font-bold w-[55px]">Nama</td>
+                                                                        <td className="border border-slate-800 p-1">{getVal(item, 'NAMA ORANG TUA ASUH') || '-'}</td>
+                                                                        <td className="border border-slate-800 p-1 font-bold w-[55px]">Nama Alm</td>
+                                                                        <td className="border border-slate-800 p-1">{namaAlm}</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 font-black text-[9pt] uppercase text-center align-middle">{getVal(item, 'NAMA ANAK')}</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td className="border border-slate-800 p-1 font-bold">Santunan</td>
+                                                                        <td className="border border-slate-800 p-1">Rp {nominal.toLocaleString('id-ID')}</td>
+                                                                        <td className="border border-slate-800 p-1 font-bold">Nama Ibu/Wali</td>
+                                                                        <td className="border border-slate-800 p-1">{namaIbu}</td>
+                                                                        <td className="border border-slate-800 p-1 font-bold w-[45px]">Status</td>
+                                                                        <td className="border border-slate-800 p-1">{statusAnak}</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td className="border border-slate-800 p-1 font-bold">Periode Aktif</td>
+                                                                        <td className="border border-slate-800 p-1">{getVal(item, 'MULAI SANTUNAN SAPA') || '-'} s/d {getVal(item, 'BERAKHIR SANTUNAN SAPA') || '-'}</td>
+                                                                        <td className="border border-slate-800 p-1 font-bold">Wilayah</td>
+                                                                        <td className="border border-slate-800 p-1">{wilayah}</td>
+                                                                        <td className="border border-slate-800 p-1 font-bold">JK</td>
+                                                                        <td className="border border-slate-800 p-1">{getVal(item, 'Jenis kelamin') || '-'} • Lahir: {getVal(item, 'TANGGAL LAHIR') || '-'}</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td className="border border-slate-800 p-1"></td>
+                                                                        <td className="border border-slate-800 p-1"></td>
+                                                                        <td className="border border-slate-800 p-1 font-bold align-top">Alamat</td>
+                                                                        <td className="border border-slate-800 p-1 align-top">{alamat}</td>
+                                                                        <td className="border border-slate-800 p-1 font-bold align-top">Sekolah</td>
+                                                                        <td className="border border-slate-800 p-1 align-top">{getVal(item, 'JENJANG SEKOLAH') || '-'} {getVal(item, 'KELAS') ? `Kls ${getVal(item, 'KELAS')}` : ''} - {getVal(item, 'NAMA SEKOLAH') || '-'}</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-2 align-bottom">Mengetahui,</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-2 align-bottom">Diterima,</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1"></td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-4 pb-1 font-bold underline uppercase text-center">RIYANTO PN</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-4 pb-1 font-bold underline uppercase text-center">{namaKorwilWilayah}</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1"></td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
                                                         );
                                                     })}
                                                     {anakAsuhList.length === 0 && (
