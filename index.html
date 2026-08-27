@@ -7145,6 +7145,7 @@ const submitArchiveChildren = async () => {
                                         >
                                             <Icon name="printer" size={16} /> Cetak Katalog
                                         </button>
+                                                {filterProgram === 'SAPA' && (
                                                 <button 
                                                     onClick={() => { 
                                                         setPrintModeAnak('anakAsuh');
@@ -7187,6 +7188,7 @@ const submitArchiveChildren = async () => {
                                         >
                                             <Icon name="printer" size={16} /> Cetak Anak Asuh
                                         </button>
+                                                )}
                                             </div>
                                             
                                             <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
