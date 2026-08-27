@@ -6942,11 +6942,11 @@ const submitArchiveChildren = async () => {
                                                             <table key={i} className="w-full border-collapse border border-slate-800 text-[7.5pt] break-inside-avoid page-break-inside-avoid">
                                                                 <tbody>
                                                                     <tr>
-                                                                        <td rowSpan={7} className="border border-slate-800 w-6 text-center font-black bg-slate-100 align-middle">{i + 1}</td>
+                                                                        <td rowSpan={8} className="border border-slate-800 w-6 text-center font-black bg-slate-100 align-middle">{i + 1}</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Orang Tua Asuh</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Orang Tua / Wali</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Anak</td>
-                                                                        <td rowSpan={7} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center">
+                                                                        <td rowSpan={8} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center">
                                                                             {getVal(item, 'FOTO ANAK') ? (
                                                                                 <img src={getVal(item, 'FOTO ANAK')} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
                                                                             ) : (
@@ -6986,13 +6986,18 @@ const submitArchiveChildren = async () => {
                                                                         <td className="border border-slate-800 p-1 align-top">{getVal(item, 'JENJANG SEKOLAH') || '-'} {getVal(item, 'KELAS') ? `Kls ${getVal(item, 'KELAS')}` : ''} - {getVal(item, 'NAMA SEKOLAH') || '-'}</td>
                                                                     </tr>
                                                                     <tr>
-                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-2 align-bottom">Mengetahui,</td>
-                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-2 align-bottom">Diterima,</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 align-bottom">Mengetahui,</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 align-bottom">Diterima,</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1"></td>
                                                                     </tr>
                                                                     <tr>
-                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-4 pb-1 font-bold underline uppercase text-center">RIYANTO PN</td>
-                                                                        <td colSpan={2} className="border border-slate-800 p-1 pt-4 pb-1 font-bold underline uppercase text-center">{namaKorwilWilayah}</td>
+                                                                        <td colSpan={2} className="border border-slate-800 h-[1.3cm]"></td>
+                                                                        <td colSpan={2} className="border border-slate-800 h-[1.3cm]"></td>
+                                                                        <td colSpan={2} className="border border-slate-800"></td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 pb-1 font-bold underline uppercase text-center">RIYANTO PN</td>
+                                                                        <td colSpan={2} className="border border-slate-800 p-1 pb-1 font-bold underline uppercase text-center">{namaKorwilWilayah}</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1"></td>
                                                                     </tr>
                                                                 </tbody>
