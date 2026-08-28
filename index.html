@@ -349,7 +349,20 @@ const maskNamaPemilik = (namaRaw) => {
             
             /* Kertas Setup */
             @page { size: A4 portrait !important; margin: 10mm !important; } 
-            body { background-color: white !important; }
+            body,
+            #main-app-container,
+            #scroll-area,
+            .print-container,
+            .print-only {
+                background-color: white !important;
+                background-image: none !important;
+                box-shadow: none !important;
+            }
+            /* Paksa warna dasar neumorphism (abu-abu #E0E5EC) jadi putih khusus saat print */
+            [class*="bg-[#E0E5EC]"] {
+                background-color: white !important;
+                box-shadow: none !important;
+            }
         }
 
         /* ANIMASI KHUSUS SPLASH SCREEN YASSA MOBILE */
