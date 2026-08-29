@@ -8857,10 +8857,40 @@ const submitArchiveChildren = async () => {
                                     </div>
                                 </div>
                                 
-                                {/* Indikator Step */}
+                                {/* Indikator Step (BISA DIKLIK: Keluarga selalu boleh balik, Anak wajib lolos validasi Step 1 dulu) */}
                                 <div className="flex bg-slate-100 p-1.5 shrink-0">
-                                    <div className={`flex-1 text-center py-2.5 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all ${regModal.step === 1 ? 'bg-white text-green-600 shadow-sm' : 'text-slate-400'}`}>1. Keluarga</div>
-                                    <div className={`flex-1 text-center py-2.5 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all ${regModal.step === 2 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>2. Anak</div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setErrorMsg(''); setRegModal({ ...regModal, step: 1 }); }}
+                                        className={`flex-1 text-center py-2.5 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all outline-none ${regModal.step === 1 ? 'bg-white text-green-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >1. Keluarga</button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (regModal.step === 2) return;
+                                            const err = validateStep1();
+                                            if (err) { setErrorMsg(err); return; }
+                                            setErrorMsg('');
+
+                                            // Sinkronisasi otomatis form anak berdasarkan Jumlah Anak (sama seperti tombol "Selanjutnya")
+                                            if (regModal.mode === 'add') {
+                                                const keyJml = Object.keys(regFamily).find(k => k.toUpperCase().includes('JUMLAH ANAK') || k.toUpperCase() === 'JML ANAK');
+                                                const jmlAnak = keyJml ? parseInt(regFamily[keyJml], 10) || 0 : 0;
+
+                                                let currentChildren = [...regChildren];
+                                                if (jmlAnak > currentChildren.length) {
+                                                    const selisih = jmlAnak - currentChildren.length;
+                                                    for(let i = 0; i < selisih; i++) currentChildren.push({});
+                                                } else if (jmlAnak < currentChildren.length) {
+                                                    currentChildren = currentChildren.slice(0, jmlAnak);
+                                                }
+                                                if (jmlAnak > 0) setRegChildren(currentChildren);
+                                            }
+
+                                            setRegModal({ ...regModal, step: 2 });
+                                        }}
+                                        className={`flex-1 text-center py-2.5 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all outline-none ${regModal.step === 2 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >2. Anak</button>
                                 </div>
 
                                 {/* Area Scrollable (Form Input) */}
