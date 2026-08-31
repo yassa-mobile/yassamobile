@@ -4589,15 +4589,18 @@ const submitArchiveChildren = async () => {
                                                 const emailKorwil = getVal(item, 'EMAIL KORWIL') || '';
                                                 const wilayah = getVal(item, 'WILAYAH') || '';
                                                 const escCSV = (v) => { const s = String(v||'').replace(/"/g,'""'); return s.includes(',') || s.includes('"') ? `"${s}"` : s; };
-                                                const printBulan = printMonthInput ? printMonthInput : '';
+                                                // Modifikasi: Bersihkan tanda baca terlarang sesuai aturan ketat Midtrans (mis. tanda "-" pada periode laporan)
+                                                const printBulan = printMonthInput ? printMonthInput.replace(/[^a-zA-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim() : '';
+                                                const bersihNamaAlm = namaAlm.toUpperCase().replace(/[^a-zA-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+                                                const remarkTextParsial = `${bersihNamaAlm} ${transferAmount > 0 ? transferAmount : ''} SANTUNAN ${printBulan}`.trim().replace(/\s+/g, ' ');
 
                                                 csvRows.push([
                                                     bankCode, 
                                                     rekening.replace(/[^0-9]/g,''), 
-                                                    escCSV(namaAlm.toUpperCase()), // Beneficiary Name pakai Nama Alm
+                                                    escCSV(bersihNamaAlm), // Beneficiary Name pakai Nama Alm (sudah dibersihkan)
                                                     escCSV(emailKorwil.toLowerCase()), // Beneficiary Email pakai Email Korwil
                                                     transferAmount||'', 
-                                                    escCSV(`${namaAlm.toUpperCase()} ${transferAmount||''} SANTUNAN ${printBulan}`.trim())
+                                                    escCSV(remarkTextParsial)
                                                 ].join(','));
                                             });
 
