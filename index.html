@@ -1982,6 +1982,12 @@ const submitArchiveChildren = async () => {
             // STATE BARU: POPUP ERROR MIDTRANS (MERAH)
             const [midtransErrorPopup, setMidtransErrorPopup] = useState({ open: false, errors: [] });
 
+            // 🆕 STATE BARU: POPUP PERINGATAN NON-GOPAY DI CSV MIDTRANS (KUNING/AMBER)
+            // CSV Midtrans hanya menghitung nominal dari program GOPAY. Kalau filter Program
+            // di layar "Semua Program" (kosong), keluarga non-GOPAY (mis. SAPA saja) tetap
+            // ikut ter-export tapi dengan Amount kosong/0 -- popup ini memperingatkan admin.
+            const [midtransWarningPopup, setMidtransWarningPopup] = useState({ open: false, warnings: [] });
+
             // STATE FILTER
             const [searchQuery, setSearchQuery] = useState(''); // nilai final (debounced) dipakai untuk filtering data
             const [searchInput, setSearchInput] = useState(''); // nilai langsung dari ketikan, supaya input terasa instan
@@ -2455,6 +2461,7 @@ const submitArchiveChildren = async () => {
                 setMsg("⏳ Memproses kamus bank Midtrans...");
 
                 const errors = []; 
+                const nonGopayWarnings = []; // 🆕 kumpulan keluarga non-GOPAY yang ikut ter-export (Amount kosong)
                 const csvRows = [];
 
                 csvRows.push([
@@ -2495,6 +2502,20 @@ const submitArchiveChildren = async () => {
                         norm(getVal(c, 'ID_Keluarga')) === famId &&
                         (getVal(c, 'PROGRAM') || '').toLowerCase().includes('gopay')
                     );
+
+                    // 🆕 PERBAIKAN: CSV Midtrans khusus program GOPAY. Kalau keluarga ini tidak
+                    // punya anak berprogram GOPAY (mis. filter "Semua Program" dipilih), keluarga
+                    // ini DILEWATI sepenuhnya dari CSV (tidak dicatat, bukan dicatat dgn Amount 0) --
+                    // dan dicatat di daftar peringatan supaya admin tahu siapa saja yang dilewati.
+                    if (gopayAnakList.length === 0) {
+                        nonGopayWarnings.push({
+                            namaIbu: namaIbu,
+                            namaAlm: namaAlm,
+                            wilayah: wilayah,
+                            noUrut: idx + 1
+                        });
+                        return;
+                    }
                     
                     const baseNominal = parseInt(printBaseNominal || 0);
                     const bonusNominal = parseInt(printBonusNominal || 0);
@@ -2505,7 +2526,7 @@ const submitArchiveChildren = async () => {
                         : 0; // Fallback ini kurang akurat jika calculator tidak ada, tapi sesuai aslinya
                     
                     // TAMBAHAN BONUS IBU DISABILITAS
-                    if (gopayAnakList.length > 0 && isIbuDsb) {
+                    if (isIbuDsb) {
                         transferAmount += bonusNominal;
                     }
 
@@ -2550,8 +2571,14 @@ const submitArchiveChildren = async () => {
                 }
 
                 if (csvRows.length <= 1) {
-                    setMsg("⚠️ Tidak ada data valid untuk diekspor ke CSV!");
-                    setTimeout(() => setMsg(""), 3000);
+                    if (nonGopayWarnings.length > 0) {
+                        // 🆕 Semua data ternyata dilewati karena bukan program GOPAY
+                        setMsg('');
+                        setMidtransWarningPopup({ open: true, warnings: nonGopayWarnings });
+                    } else {
+                        setMsg("⚠️ Tidak ada data valid untuk diekspor ke CSV!");
+                        setTimeout(() => setMsg(""), 3000);
+                    }
                     return;
                 }
 
@@ -2571,6 +2598,12 @@ const submitArchiveChildren = async () => {
                 sendLog(activeUser, role, userWilayah, `Download CSV Midtrans (${printWilayah}, ${csvRows.length - 1} baris)`);
                 setMsg(`✅ CSV Midtrans berhasil diunduh! (${csvRows.length - 1} baris)`);
                 setTimeout(() => setMsg(""), 4000);
+
+                // 🆕 Tampilkan peringatan (tidak membatalkan unduhan) kalau ada keluarga
+                // non-GOPAY yang ikut ter-export dengan Amount kosong/0.
+                if (nonGopayWarnings.length > 0) {
+                    setMidtransWarningPopup({ open: true, warnings: nonGopayWarnings });
+                }
             }, [filteredKeluarga, data.anak, resolveBankCode, filterWilayah, printMonthInput, printBaseNominal, printBonusNominal, activeUser, role, userWilayah, paperColors]);
 
             const norm = (id) => String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
@@ -4546,6 +4579,7 @@ const submitArchiveChildren = async () => {
                                             setMidtransErrorPopup({ open: false, errors: [] });
                                             
                                             const csvRows = [];
+                                            const nonGopayWarningsParsial = []; // 🆕 kumpulan keluarga non-GOPAY yang DILEWATI dari CSV
                                             csvRows.push(['Beneficiary Bank','Beneficiary Account','Beneficiary Name','Beneficiary Email','Amount','Remarks'].join(','));
                                             
                                             dataValid.forEach((item) => {
@@ -4570,6 +4604,19 @@ const submitArchiveChildren = async () => {
                                                 
                                                 const famId = norm(getVal(item, 'ID_Keluarga'));
                                                 const gopayAnakList = (anakByKeluargaMap[famId] || []).filter(c => (getVal(c, 'PROGRAM') || '').toLowerCase().includes('gopay'));
+
+                                                // 🆕 PERBAIKAN: keluarga tanpa anak GOPAY DILEWATI sepenuhnya dari CSV
+                                                // (tidak dicatat, bukan dicatat dgn Amount 0), dan dicatat di daftar peringatan.
+                                                if (gopayAnakList.length === 0) {
+                                                    nonGopayWarningsParsial.push({
+                                                        namaIbu: namaIbu,
+                                                        namaAlm: namaAlm,
+                                                        wilayah: getVal(item, 'WILAYAH') || '',
+                                                        noUrut: nonGopayWarningsParsial.length + 1
+                                                    });
+                                                    return;
+                                                }
+
                                                 const baseNominal = parseInt(printBaseNominal || 0);
                                                 const bonusNominal = parseInt(printBonusNominal || 0);
                                                 
@@ -4579,7 +4626,7 @@ const submitArchiveChildren = async () => {
                                                     : 0;
                                                     
                                                 // TAMBAHAN BONUS IBU DISABILITAS
-                                                if (gopayAnakList.length > 0 && isIbuDsb) {
+                                                if (isIbuDsb) {
                                                     transferAmount += bonusNominal;
                                                 }
 
@@ -4619,10 +4666,74 @@ const submitArchiveChildren = async () => {
                                             sendLog(activeUser, role, userWilayah, `Download CSV Midtrans Parsial (${dataValid.length} baris, ${midtransErrorPopup.errors.length} dilewati)`);
                                             setMsg(`✅ CSV Parsial diunduh (${dataValid.length} baris, ${midtransErrorPopup.errors.length} dilewati)`);
                                             setTimeout(() => setMsg(""), 5000);
+
+                                            // 🆕 Tampilkan peringatan (tidak membatalkan unduhan) kalau ada keluarga
+                                            // non-GOPAY yang ikut ter-export dengan Amount kosong/0.
+                                            if (nonGopayWarningsParsial.length > 0) {
+                                                setMidtransWarningPopup({ open: true, warnings: nonGopayWarningsParsial });
+                                            }
                                         }}
                                         className="flex-1 bg-rose-600 text-white py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg"
                                     >
                                         Lewati & Download Parsial
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🆕 POPUP PERINGATAN (KUNING/AMBER): keluarga non-GOPAY ikut ter-export di CSV Midtrans */}
+                    {midtransWarningPopup.open && (
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 fade-in no-print">
+                            <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                                {/* Header Amber */}
+                                <div className="bg-amber-500 p-5 flex items-start justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-2.5 rounded-xl shrink-0">
+                                            <Icon name="alert-triangle" size={22} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black text-white text-sm uppercase tracking-wider leading-tight">Ada Keluarga Non-GOPAY!</h3>
+                                            <p className="text-amber-100 text-[10px] font-bold mt-0.5 uppercase tracking-widest">Dilewati dari CSV Midtrans</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setMidtransWarningPopup({ open: false, warnings: [] })} className="bg-white/20 p-2 rounded-xl hover:bg-white/30 transition-all shrink-0 mt-0.5">
+                                        <Icon name="x" size={16} className="text-white" />
+                                    </button>
+                                </div>
+
+                                {/* Penjelasan */}
+                                <div className="px-5 pt-4 pb-2 bg-amber-50 border-b border-amber-100">
+                                    <p className="text-amber-800 text-[11px] font-bold leading-relaxed">
+                                        CSV Midtrans hanya untuk program <span className="font-black">GOPAY</span>. Ada <span className="font-black text-amber-900">{midtransWarningPopup.warnings.length} keluarga</span> tanpa anak berprogram GOPAY yang <span className="font-black">DILEWATI (tidak dicatat)</span> dari CSV ini.
+                                    </p>
+                                </div>
+
+                                {/* Daftar Keluarga */}
+                                <div className="overflow-y-auto flex-1 divide-y divide-amber-100">
+                                    {midtransWarningPopup.warnings.map((w, i) => (
+                                        <div key={i} className="px-5 py-3 bg-white hover:bg-amber-50 transition-colors">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-black text-slate-800 text-xs uppercase truncate">{w.namaIbu}</p>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest truncate">Alm: {w.namaAlm} · {w.wilayah}</p>
+                                                </div>
+                                                <div className="shrink-0 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg text-right">
+                                                    <p className="text-[9px] text-amber-600 font-bold uppercase">Status:</p>
+                                                    <p className="font-black text-amber-700 text-xs uppercase">Dilewati</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Footer Aksi */}
+                                <div className="p-4 bg-slate-50 border-t">
+                                    <button 
+                                        onClick={() => setMidtransWarningPopup({ open: false, warnings: [] })}
+                                        className="w-full bg-amber-500 text-white py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg"
+                                    >
+                                        Oke, Mengerti
                                     </button>
                                 </div>
                             </div>
