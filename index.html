@@ -2570,17 +2570,15 @@ const submitArchiveChildren = async () => {
                     return;
                 }
 
-                if (csvRows.length <= 1) {
-                    if (nonGopayWarnings.length > 0) {
-                        // 🆕 Semua data ternyata dilewati karena bukan program GOPAY
-                        setMsg('');
-                        setMidtransWarningPopup({ open: true, warnings: nonGopayWarnings });
-                    } else {
-                        setMsg("⚠️ Tidak ada data valid untuk diekspor ke CSV!");
-                        setTimeout(() => setMsg(""), 3000);
-                    }
+                if (csvRows.length <= 1 && nonGopayWarnings.length === 0) {
+                    // Benar-benar tidak ada data sama sekali (bukan krn dilewati non-GOPAY) -> batalkan total
+                    setMsg("⚠️ Tidak ada data valid untuk diekspor ke CSV!");
+                    setTimeout(() => setMsg(""), 3000);
                     return;
                 }
+                // 🛠️ FIX: kalau csvRows cuma berisi header (semua keluarga yg lolos filter ternyata
+                // non-GOPAY), file CSV (header-only) TETAP di-download -- tidak lagi dibatalkan.
+                // Popup kuning di bawah cuma jadi peringatan/pengingat, bukan pembatal proses download.
 
                 const csvContent = csvRows.join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
