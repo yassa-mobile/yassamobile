@@ -3538,7 +3538,6 @@ const submitArchiveChildren = async () => {
                 setMsg(`✅ Excel Katalog berhasil diunduh! (${rows.length} Anak)`);
                 setTimeout(() => setMsg(""), 4000);
             }, [filteredAnak, familyLookupMap, filterKategoriAnak, filterWilayah, activeUser, role, userWilayah]);
-            }, [filteredKeluarga, data.keluarga, data.anak, familyLookupMap, anakByKeluargaMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
 
             // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — isSuperAdminControl datang dari backend
             // (Code.gs, dikirim saat login), bukan dihitung dari daftar nomor HP di sini.
