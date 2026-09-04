@@ -6964,6 +6964,11 @@ const submitArchiveChildren = async () => {
                                                             <span className="font-bold">J. Kelamin</span><span>:</span><span>{getVal(item, 'Jenis kelamin') || '-'}</span>
                                                             <span className="font-bold">Lahir/Umur</span><span>:</span><span>{getVal(item, 'TANGGAL LAHIR') || '-'} {getVal(item, 'UMUR') ? `(${getVal(item, 'UMUR')} Thn)` : ''}</span>
                                                             <span className="font-bold">Pendidikan</span><span>:</span><span className="leading-tight">{pendidikanStr || '-'}</span>
+                                                            {filterKategoriAnak === 'Disabilitas' && (
+                                                                <>
+                                                                    <span className="font-bold">Diagnosa</span><span>:</span><span className="leading-tight">{getVal(item, 'JENIS DISABILITAS') || '-'}</span>
+                                                                </>
+                                                            )}
                                                             <span className="font-bold mt-1.5">Nama Alm</span><span className="mt-1.5">:</span><span className="mt-1.5 font-black text-slate-900 uppercase">{namaAlm}</span>
                                                             <span className="font-bold">Nama Ibu</span><span>:</span><span className="uppercase font-bold text-slate-800">{namaIbu}</span>
                                                             <span className="font-bold">Wilayah</span><span>:</span><span className="uppercase">{wilayah}</span>
