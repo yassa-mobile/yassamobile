@@ -3493,6 +3493,51 @@ const submitArchiveChildren = async () => {
                 sendLog(activeUser, role, userWilayah, `Export Excel Data KK & Anak (${printWilayah}, ${rowsKK.length} KK, ${rowsAnak.length} Anak)`);
                 setMsg(`✅ Excel berhasil diunduh! (${rowsKK.length} KK, ${rowsAnak.length} Anak)`);
                 setTimeout(() => setMsg(""), 4000);
+            }, [filteredKeluarga, data.keluarga, data.anak, anakByKeluargaMap, familyLookupMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
+
+            // 🆕 EXPORT KATALOG ANAK KE EXCEL — dari data YANG SAMA dipakai Cetak Katalog
+            // (ikut semua filter aktif: Wilayah, Program, Kategori Anak/Disabilitas, Jenjang, Kelas, pencarian nama)
+            const handleExportKatalogExcel = useCallback(() => {
+                if (typeof XLSX === 'undefined') {
+                    setMsg("⚠️ Modul Excel belum siap dimuat. Coba refresh halaman & pastikan internet aktif.");
+                    setTimeout(() => setMsg(""), 4000);
+                    return;
+                }
+                if (!filteredAnak || filteredAnak.length === 0) {
+                    setMsg("⚠️ Tidak ada data anak (sesuai filter) untuk diekspor!");
+                    setTimeout(() => setMsg(""), 3000);
+                    return;
+                }
+
+                const rows = filteredAnak.map(item => {
+                    const parent = familyLookupMap[norm(getVal(item, 'ID_Keluarga'))];
+                    const row = {
+                        'ID_Keluarga': getVal(item, 'ID_Keluarga') || '',
+                        'WILAYAH': parent ? (getVal(parent, 'WILAYAH') || '-') : '-',
+                        'NAMA ALM': parent ? (getVal(parent, 'NAMA ALM') || '-') : '-',
+                        'NAMA IBU': parent ? (getVal(parent, 'NAMA IBU') || '-') : '-',
+                        'ALAMAT': parent ? (getVal(parent, 'ALAMAT') || '-') : '-',
+                    };
+                    ANAK_FIELDS.forEach(fld => { row[fld.key] = getVal(item, fld.key) || ''; });
+                    return row;
+                });
+                const header = ['ID_Keluarga', 'WILAYAH', 'NAMA ALM', 'NAMA IBU', 'ALAMAT', ...ANAK_FIELDS.map(f => f.key)];
+
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(rows, { header });
+                XLSX.utils.book_append_sheet(wb, ws, 'Katalog Anak');
+
+                const namaKategori = filterKategoriAnak ? filterKategoriAnak.replace(/\s+/g, '_') : 'SEMUA';
+                const namaWilayah = filterWilayah ? filterWilayah.toUpperCase().replace(/\s+/g, '_') : 'SEMUA_WILAYAH';
+                const tanggalFile = new Date().toISOString().slice(0, 10);
+                const namaFile = `Katalog_Anak_${namaKategori}_${namaWilayah}_${tanggalFile}.xlsx`;
+
+                XLSX.writeFile(wb, namaFile);
+
+                sendLog(activeUser, role, userWilayah, `Export Excel Katalog Anak (Kategori: ${namaKategori}, ${rows.length} Anak)`);
+                setMsg(`✅ Excel Katalog berhasil diunduh! (${rows.length} Anak)`);
+                setTimeout(() => setMsg(""), 4000);
+            }, [filteredAnak, familyLookupMap, filterKategoriAnak, filterWilayah, activeUser, role, userWilayah]);
             }, [filteredKeluarga, data.keluarga, data.anak, familyLookupMap, anakByKeluargaMap, filterWilayah, role, allowedRegions, activeUser, userWilayah]);
 
             // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — isSuperAdminControl datang dari backend
@@ -6922,7 +6967,7 @@ const submitArchiveChildren = async () => {
                                     <div className="border-t-[3px] border-slate-900 mb-6"></div>
                                     
                                     <div className="text-center mb-6">
-                                        <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Katalog Profil Anak Asuh</h2>
+                                        <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Katalog Profil Anak</h2>
                                         <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
                                             Wilayah: {filterWilayah || 'SEMUA'} • Program: {filterProgram || 'SEMUA'} • Kategori: {filterKategoriAnak || 'SEMUA'}
                                             {filterJenjang.length > 0 ? ` • Jenjang: ${filterJenjang.join(', ')}` : ''}
@@ -7274,6 +7319,13 @@ const submitArchiveChildren = async () => {
                                             className="w-full sm:w-auto p-3.5 px-6 rounded-2xl bg-[#E0E5EC] border-none text-emerald-600 transition-all flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] outline-none"
                                         >
                                             <Icon name="printer" size={16} /> Cetak Katalog
+                                        </button>
+                                        <button
+                                            onClick={handleExportKatalogExcel}
+                                            className="w-full sm:w-auto p-3.5 px-6 rounded-2xl bg-[#E0E5EC] border-none text-teal-700 transition-all flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] outline-none"
+                                            title="Export data hasil filter saat ini (Wilayah/Program/Kategori/Jenjang/Kelas) ke Excel"
+                                        >
+                                            <Icon name="file-spreadsheet" size={16} /> Export Excel
                                         </button>
                                                 {filterProgram === 'SAPA' && (
                                                 <button 
