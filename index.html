@@ -219,6 +219,47 @@ const maskNamaPemilik = (namaRaw) => {
     }
     return [kata[0], ...kata.slice(1).map(k => '*'.repeat(k.length))].join(' ');
 };
+
+// ============================================================
+// 🔒 MASKING TANGGAL LAHIR UNTUK CETAK KATALOG ANAK
+// Tanggal (hari) disembunyikan jadi "xx", bulan & tahun tetap
+// tampil demi menjaga privasi identitas anak.
+// Data mentah dari sheet berformat yyyy-MM-dd, hasil masking
+// ditampilkan dalam format Indonesia (dd-MM-yyyy).
+// Contoh: 2024-06-15  ->  xx-06-2024
+// ============================================================
+const maskTanggalLahirKatalog = (tglRaw) => {
+    const bersih = String(tglRaw || '').trim();
+    if (!bersih || bersih === '-') return '-';
+    const bagian = bersih.split(/[-\/]/).filter(Boolean);
+    if (bagian.length === 3) {
+        // Format yyyy-MM-dd (bagian pertama 4 digit = tahun)
+        if (bagian[0].length === 4) return `xx-${bagian[1]}-${bagian[0]}`;
+        // Format dd-MM-yyyy (bagian terakhir 4 digit = tahun)
+        if (bagian[2].length === 4) return `xx-${bagian[1]}-${bagian[2]}`;
+    }
+    return bersih; // format tak dikenali, tampilkan apa adanya
+};
+
+// ============================================================
+// 🔒 MASKING ALAMAT UNTUK CETAK KATALOG ANAK
+// Detail spesifik (nama jalan, no rumah, RT/RW) disamarkan,
+// hanya area umum (kelurahan/kecamatan/kabupaten - biasanya
+// segmen terakhir yang dipisah koma) yang tetap ditampilkan.
+// Contoh: "Jl. Mawar No.12 RT03/RW05, Ds. Sukamaju, Kec. Cileungsi"
+//         -> "•••, Ds. Sukamaju, Kec. Cileungsi"
+// ============================================================
+const maskAlamatKatalog = (alamatRaw) => {
+    const bersih = String(alamatRaw || '').trim();
+    if (!bersih || bersih === '-') return '-';
+    const bagian = bersih.split(',').map(p => p.trim()).filter(Boolean);
+    if (bagian.length > 1) {
+        // Sensor segmen pertama (jalan/no rumah/RT-RW), sisakan 2 segmen terakhir (area umum)
+        return `•••, ${bagian.slice(-2).join(', ')}`;
+    }
+    // Tanpa koma: sensor angka (no rumah/RT/RW), sisanya (nama area) tetap tampil
+    return bersih.replace(/\d+/g, 'xx');
+};
 </script>
 <script>
     // DATA KONFIGURASI FORM DAN WILAYAH
@@ -7002,7 +7043,7 @@ const submitArchiveChildren = async () => {
                                                         <p className="font-black text-[10pt] text-slate-900 uppercase mb-1 pb-1 border-b border-slate-200">{getVal(item, 'NAMA ANAK')}</p>
                                                         <div className="grid grid-cols-[65px_5px_1fr] items-start gap-y-0.5">
                                                             <span className="font-bold">J. Kelamin</span><span>:</span><span>{getVal(item, 'Jenis kelamin') || '-'}</span>
-                                                            <span className="font-bold">Lahir/Umur</span><span>:</span><span>{getVal(item, 'TANGGAL LAHIR') || '-'} {getVal(item, 'UMUR') ? `(${getVal(item, 'UMUR')} Thn)` : ''}</span>
+                                                            <span className="font-bold">Lahir/Umur</span><span>:</span><span>{maskTanggalLahirKatalog(getVal(item, 'TANGGAL LAHIR'))} {getVal(item, 'UMUR') ? `(${getVal(item, 'UMUR')} Thn)` : ''}</span>
                                                             <span className="font-bold">Pendidikan</span><span>:</span><span className="leading-tight">{pendidikanStr || '-'}</span>
                                                             {filterKategoriAnak === 'Disabilitas' && (
                                                                 <>
@@ -7012,7 +7053,7 @@ const submitArchiveChildren = async () => {
                                                             <span className="font-bold mt-1.5">Nama Alm</span><span className="mt-1.5">:</span><span className="mt-1.5 font-black text-slate-900 uppercase">{namaAlm}</span>
                                                             <span className="font-bold">Nama Ibu</span><span>:</span><span className="uppercase font-bold text-slate-800">{namaIbu}</span>
                                                             <span className="font-bold">Wilayah</span><span>:</span><span className="uppercase">{wilayah}</span>
-                                                            <span className="font-bold">Alamat</span><span>:</span><span className="leading-tight uppercase">{alamat}</span>
+                                                            <span className="font-bold">Alamat</span><span>:</span><span className="leading-tight uppercase">{maskAlamatKatalog(alamat)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
