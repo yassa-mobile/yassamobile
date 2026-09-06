@@ -631,6 +631,71 @@ const maskAlamatKatalog = (alamatRaw) => {
         };
 
         // ============================================================
+        // 🩹 [BARU] KONVERSI FOTO PROXY (GASIMG) JADI data: URL SEBELUM CETAK
+        // ------------------------------------------------------------
+        // Foto anak yang lewat proxy backend (?action=getImage&id=...&token=...)
+        // butuh request jaringan ke Apps Script tiap kali <img> dirender --
+        // ini BISA lambat (validasi token + DriveApp.getFileById + cek folder
+        // + ambil blob, kadang beberapa detik, apalagi "cold start"), dan KALAU
+        // GAGAL (mis. sesi kebetulan invalid saat itu), <img onError> langsung
+        // menyembunyikan foto (display:none) -- jadi foto hilang total, bukan
+        // cuma telat.
+        //
+        // Sebelumnya kita cuma menunggu PASIF event 'load'/'error' dengan
+        // timeout pendek (6 detik) -- kalau proxy-nya lambat dikit saja,
+        // window.print() sudah keburu jalan duluan sebelum foto sempat tampil.
+        //
+        // Fix: sebelum cetak, kita AKTIF fetch() byte foto proxy tsb, ubah
+        // jadi data: URL (base64), lalu ganti src <img>-nya. Dengan begitu:
+        //  - proses cetak benar-benar MENUNGGU (await) foto selesai diambil,
+        //    bukan cuma menebak sudah selesai dalam waktu singkat,
+        //  - begitu berhasil di-fetch, foto PASTI tampil (sudah ada di memori
+        //    browser, tidak butuh request lagi saat window.print()).
+        // Foto yang bukan proxy (link Drive/URL manual biasa) tidak disentuh,
+        // biar tetap dimuat & ditunggu seperti biasa lewat waitForImagesToLoad.
+        // ============================================================
+        const embedProxyFotoAsDataUrl = async (maxWaitMs = 20000) => {
+            const proxyImgs = Array.from(document.querySelectorAll('img[src*="action=getImage"]'));
+            if (proxyImgs.length === 0) return;
+
+            const convertOne = async (img) => {
+                const originalSrc = img.src;
+                try {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), maxWaitMs);
+                    const res = await fetch(originalSrc, { signal: controller.signal });
+                    clearTimeout(timer);
+                    if (!res.ok) return; // biarkan <img onError> bawaan yang menangani
+                    const blob = await res.blob();
+                    // Kalau backend kebetulan membalas TEKS (mis. "Sesi tidak valid...")
+                    // bukan gambar (harusnya sudah ketahuan dari !res.ok, tapi jaga-jaga
+                    // kalau Apps Script tetap balas 200 dengan pesan teks), jangan
+                    // dipaksa jadi <img> -- biarkan tetap gagal secara wajar.
+                    if (blob.type && !blob.type.startsWith('image/')) return;
+                    const dataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    img.src = dataUrl;
+                } catch (eFetch) {
+                    // Gagal (timeout/jaringan/dll) -- biarkan src proxy lama apa
+                    // adanya, nanti ditangani jalur waitForImagesToLoad + onError
+                    // seperti sebelumnya, jangan sampai memutus proses cetak.
+                }
+            };
+
+            // Proses satu-persatu (bukan Promise.all serentak) supaya tidak
+            // menembak banyak request bersamaan ke Apps Script (ada batas
+            // eksekusi paralel) -- untuk katalog dengan banyak anak ini juga
+            // lebih stabil walau sedikit lebih lambat.
+            for (const img of proxyImgs) {
+                await convertOne(img);
+            }
+        };
+
+        // ============================================================
         // ⏳ TUNGGU SEMUA GAMBAR SELESAI DIMUAT SEBELUM window.print()
         // Sejak foto anak lewat proxy backend (bukan link langsung Drive),
         // butuh waktu request jaringan tambahan yang tidak selalu selesai
@@ -639,8 +704,13 @@ const maskAlamatKatalog = (alamatRaw) => {
         // Fungsi ini menunggu tiap <img> di halaman sampai 'load' atau
         // 'error' (gambar gagal pun tetap lanjut, jangan sampai macet
         // selamanya), dibatasi waktu tunggu maksimum sebagai jaga-jaga.
+        //
+        // 🩹 [DIUBAH] Sebelum menunggu, foto proxy (GASIMG) dikonversi dulu
+        // jadi data: URL lewat embedProxyFotoAsDataUrl() di atas -- lihat
+        // komentar di sana untuk alasannya.
         // ============================================================
-        const waitForImagesToLoad = (maxWaitMs = 6000) => {
+        const waitForImagesToLoad = async (maxWaitMs = 6000) => {
+            await embedProxyFotoAsDataUrl();
             const imgs = Array.from(document.querySelectorAll('img'));
             const pending = imgs.filter(img => !img.complete);
             if (pending.length === 0) return Promise.resolve();
