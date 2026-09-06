@@ -652,6 +652,107 @@ const maskAlamatKatalog = (alamatRaw) => {
         };
 
         // ============================================================
+        // 🖼️ [BARU] KOMPONEN <FotoAnak> -- SATU-SATUNYA CARA MENAMPILKAN FOTO ANAK
+        // ------------------------------------------------------------
+        // Akar masalah lama: backend (?action=getImage) sebelumnya membalas
+        // Blob mentah lewat doGet(), padahal Apps Script doGet() CUMA boleh
+        // mengembalikan HtmlOutput atau ContentService.TextOutput -- jadi
+        // proxy foto privat ini sejak awal tidak pernah benar-benar bisa
+        // mengirim gambar (bukan soal token/folder/timing print).
+        //
+        // Backend sekarang membalas JSON: { success, base64, mimeType }.
+        // Komponen ini yang urus fetch + decode base64 -> data: URL, dipakai
+        // di SEMUA tempat foto anak ditampilkan (list, kartu, cetak/print,
+        // dll) -- bukan cuma pas print seperti perbaikan sebelumnya -- supaya
+        // foto proxy juga tampil normal di layar biasa.
+        //
+        // Link lama/manual (bukan "GASIMG:") tetap dirender langsung lewat
+        // resolveFotoUrl() apa adanya, demi kompatibilitas data lama.
+        //
+        // 🖨️ PELACAK "MASIH MEMUAT" GLOBAL: window.__fotoAnakPending dihitung
+        // naik/turun tiap kali ada <FotoAnak> proxy yang sedang fetch, supaya
+        // proses cetak (waitForImagesToLoad) bisa MENUNGGU sampai semua foto
+        // proxy selesai di-decode, bukan menebak dari event <img onload>
+        // (yang sudah tidak relevan karena <img> di sini langsung diberi
+        // data: URL, bukan src proxy mentah).
+        // ============================================================
+        window.__fotoAnakPending = window.__fotoAnakPending || 0;
+
+        const FotoAnak = ({ raw, namaAnak, alt, className, style, onErrorFallback }) => {
+            const v = String(raw || '').trim();
+            const isProxy = v.startsWith('GASIMG:');
+            const [dataUrl, setDataUrl] = useState(() => (isProxy ? '' : resolveFotoUrl(v)));
+            const [gagal, setGagal] = useState(false);
+
+            useEffect(() => {
+                let batal = false;
+                if (!isProxy) {
+                    setDataUrl(resolveFotoUrl(v));
+                    setGagal(false);
+                    return;
+                }
+                setDataUrl('');
+                setGagal(false);
+                const url = resolveFotoUrl(v);
+                window.__fotoAnakPending++;
+                fetch(url)
+                    .then((res) => res.json())
+                    .then((json) => {
+                        if (batal) return;
+                        if (json && json.success && json.base64) {
+                            setDataUrl(`data:${json.mimeType || 'image/jpeg'};base64,${json.base64}`);
+                        } else {
+                            setGagal(true);
+                        }
+                    })
+                    .catch(() => { if (!batal) setGagal(true); })
+                    .finally(() => { window.__fotoAnakPending = Math.max(0, window.__fotoAnakPending - 1); });
+                return () => { batal = true; };
+            }, [v, isProxy]);
+
+            const handleErr = (e) => {
+                if (onErrorFallback) return onErrorFallback(e);
+                return handleFotoImgError(e, namaAnak);
+            };
+
+            // Placeholder ringan selagi foto proxy masih di-fetch & didecode
+            if (isProxy && !dataUrl && !gagal) {
+                return (
+                    <div
+                        className={className}
+                        style={{ ...(style || {}), background: '#E0E5EC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <span style={{ fontSize: '9px', color: '#94a3b8' }}>...</span>
+                    </div>
+                );
+            }
+
+            if (gagal) {
+                // Sama seperti handleFotoImgError: tampilkan avatar inisial nama,
+                // bukan disembunyikan, supaya bingkai/layout tidak ikut hilang.
+                const nama = (namaAnak || '').toString().trim() || 'Anak';
+                return (
+                    <img
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=E0E5EC&color=475569&bold=true&size=128`}
+                        alt={alt || 'Foto'}
+                        className={className}
+                        style={style}
+                    />
+                );
+            }
+
+            return (
+                <img
+                    src={dataUrl}
+                    alt={alt || 'Foto'}
+                    className={className}
+                    style={style}
+                    onError={handleErr}
+                />
+            );
+        };
+
+        // ============================================================
         // 🩹 [BARU] KONVERSI FOTO PROXY (GASIMG) JADI data: URL SEBELUM CETAK
         // ------------------------------------------------------------
         // Foto anak yang lewat proxy backend (?action=getImage&id=...&token=...)
@@ -676,43 +777,17 @@ const maskAlamatKatalog = (alamatRaw) => {
         // biar tetap dimuat & ditunggu seperti biasa lewat waitForImagesToLoad.
         // ============================================================
         const embedProxyFotoAsDataUrl = async (maxWaitMs = 20000) => {
-            const proxyImgs = Array.from(document.querySelectorAll('img[src*="action=getImage"]'));
-            if (proxyImgs.length === 0) return;
-
-            const convertOne = async (img) => {
-                const originalSrc = img.src;
-                try {
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), maxWaitMs);
-                    const res = await fetch(originalSrc, { signal: controller.signal });
-                    clearTimeout(timer);
-                    if (!res.ok) return; // biarkan <img onError> bawaan yang menangani
-                    const blob = await res.blob();
-                    // Kalau backend kebetulan membalas TEKS (mis. "Sesi tidak valid...")
-                    // bukan gambar (harusnya sudah ketahuan dari !res.ok, tapi jaga-jaga
-                    // kalau Apps Script tetap balas 200 dengan pesan teks), jangan
-                    // dipaksa jadi <img> -- biarkan tetap gagal secara wajar.
-                    if (blob.type && !blob.type.startsWith('image/')) return;
-                    const dataUrl = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.onerror = reject;
-                        reader.readAsDataURL(blob);
-                    });
-                    img.src = dataUrl;
-                } catch (eFetch) {
-                    // Gagal (timeout/jaringan/dll) -- biarkan src proxy lama apa
-                    // adanya, nanti ditangani jalur waitForImagesToLoad + onError
-                    // seperti sebelumnya, jangan sampai memutus proses cetak.
-                }
-            };
-
-            // Proses satu-persatu (bukan Promise.all serentak) supaya tidak
-            // menembak banyak request bersamaan ke Apps Script (ada batas
-            // eksekusi paralel) -- untuk katalog dengan banyak anak ini juga
-            // lebih stabil walau sedikit lebih lambat.
-            for (const img of proxyImgs) {
-                await convertOne(img);
+            // 🩹 [DIUBAH] Sejak foto anak SELALU dirender lewat komponen
+            // <FotoAnak>, tidak ada lagi <img src="...action=getImage...">
+            // mentah di DOM -- <FotoAnak> sendiri yang fetch JSON base64 dan
+            // langsung memasang <img src="data:..."> begitu selesai. Jadi di
+            // sini kita tidak perlu fetch ulang; cukup TUNGGU pelacak global
+            // window.__fotoAnakPending turun ke 0 (semua <FotoAnak> proxy
+            // selesai di-decode), dibatasi maxWaitMs sebagai jaga-jaga supaya
+            // proses cetak tidak macet selamanya kalau ada foto yang gagal.
+            const mulai = Date.now();
+            while (window.__fotoAnakPending > 0 && (Date.now() - mulai) < maxWaitMs) {
+                await new Promise((resolve) => setTimeout(resolve, 150));
             }
         };
 
@@ -6016,11 +6091,11 @@ const submitArchiveChildren = async () => {
                                                                     <div key={idx} className={`p-3 print:py-1 print:px-1.5 rounded-2xl print:rounded-md border relative ${isSelected ? 'bg-[#bfdbfe] border-[#93c5fd]' : 'bg-slate-50 border-slate-100'}`}>
                                                                         <div className="flex items-start gap-3 print:gap-1.5">
                                                                             {getVal(c, 'FOTO ANAK') && (
-                                                                                <img 
-                                                                                    src={resolveFotoUrl(getVal(c, 'FOTO ANAK'))} 
-                                                                                    alt="Foto Anak" 
-                                                                                    className={`object-cover shrink-0 bg-white ${!isSapaChild ? 'w-10 h-10 rounded-full border border-slate-200 print:hidden' : 'w-10 h-10 rounded-full border border-slate-200 print:w-10 print:h-10 print:rounded-md print:border-slate-300'}`} 
-                                                                                    onError={(e)=>handleFotoImgError(e, getVal(c, 'NAMA ANAK'))} 
+                                                                                <FotoAnak
+                                                                                    raw={getVal(c, 'FOTO ANAK')}
+                                                                                    namaAnak={getVal(c, 'NAMA ANAK')}
+                                                                                    alt="Foto Anak"
+                                                                                    className={`object-cover shrink-0 bg-white ${!isSapaChild ? 'w-10 h-10 rounded-full border border-slate-200 print:hidden' : 'w-10 h-10 rounded-full border border-slate-200 print:w-10 print:h-10 print:rounded-md print:border-slate-300'}`}
                                                                                 />
                                                                             )}
                                                                             <div className="flex-1 min-w-0">
@@ -7174,7 +7249,7 @@ const submitArchiveChildren = async () => {
                                                 <div key={i} className="border border-slate-300 rounded-xl p-3 flex gap-3 shadow-sm break-inside-avoid page-break-inside-avoid">
                                                     <div className="w-[3.5cm] h-[4.5cm] shrink-0" style={{minWidth:'3.5cm', minHeight:'4.5cm', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
                                                         {getVal(item, 'FOTO ANAK') ? (
-                                                            <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-full object-cover rounded-md border border-slate-200" onError={(e)=>handleFotoImgError(e, getVal(item, 'NAMA ANAK'))} />
+                                                            <FotoAnak raw={getVal(item, 'FOTO ANAK')} namaAnak={getVal(item, 'NAMA ANAK')} className="w-full h-full object-cover rounded-md border border-slate-200" />
                                                         ) : (
                                                             <div className="w-full h-full bg-slate-50 rounded-md border border-slate-200 flex items-center justify-center text-[8px] text-slate-300 font-bold text-center p-2">NO FOTO</div>
                                                         )}
@@ -7297,7 +7372,7 @@ const submitArchiveChildren = async () => {
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Anak</td>
                                                                         <td rowSpan={8} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center" style={{minWidth:'2.6cm', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
                                                                             {getVal(item, 'FOTO ANAK') ? (
-                                                                                <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" style={{minHeight:'3.2cm'}} onError={(e)=>handleFotoImgError(e, getVal(item, 'NAMA ANAK'))} />
+                                                                                <FotoAnak raw={getVal(item, 'FOTO ANAK')} namaAnak={getVal(item, 'NAMA ANAK')} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" style={{minHeight:'3.2cm'}} />
                                                                             ) : (
                                                                                 <div className="w-full h-[3.2cm] bg-slate-50 flex items-center justify-center text-[6pt] text-slate-300 font-bold text-center p-1">NO FOTO</div>
                                                                             )}
@@ -7637,7 +7712,7 @@ const submitArchiveChildren = async () => {
                                         return (
                                             <div key={i} className="bg-[#E0E5EC] p-5 rounded-[2rem] border-none flex justify-between items-center shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] gap-2">
                                                 {getVal(item, 'FOTO ANAK') && (
-                                                    <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} alt="Foto" className={`w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-50 ${!isSapa ? 'print:hidden' : ''}`} onError={(e)=>handleFotoImgError(e, getVal(item, 'NAMA ANAK'))} />
+                                                    <FotoAnak raw={getVal(item, 'FOTO ANAK')} namaAnak={getVal(item, 'NAMA ANAK')} alt="Foto" className={`w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-50 ${!isSapa ? 'print:hidden' : ''}`} />
                                                 )}
                                                 <div className="flex-1 min-w-0 pr-2">
                                                     <p className="font-black text-slate-800 text-sm uppercase truncate mb-1">{getVal(item, 'NAMA ANAK')}</p>
@@ -7876,7 +7951,7 @@ const submitArchiveChildren = async () => {
                                                                 <span className="text-[6px] font-black uppercase">PDF</span>
                                                             </a>
                                                         ) : fotoUtama ? (
-                                                            <img src={resolveFotoUrl(fotoUtama)} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                                                            <FotoAnak raw={fotoUtama} namaAnak={getVal(item, 'NAMA ANAK')} className="w-full h-full object-cover" onErrorFallback={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-amber-400"><Icon name="award" size={22} /></div>
                                                         )}
@@ -9441,7 +9516,7 @@ const submitArchiveChildren = async () => {
                                                         <div className="w-full sm:w-[150px] flex flex-col items-center gap-3 shrink-0">
                                                             <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-[2rem] bg-white border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner group">
                                                                 {child['FOTO ANAK'] ? (
-                                                                    <img src={resolveFotoUrl(child['FOTO ANAK'])} alt="Foto Anak" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.target.onerror = null; e.target.src = ''; }} />
+                                                                    <FotoAnak raw={child['FOTO ANAK']} namaAnak={child['NAMA ANAK']} alt="Foto Anak" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onErrorFallback={(e) => { e.target.onerror = null; e.target.src = ''; }} />
                                                                 ) : (
                                                                     <div className="flex flex-col items-center opacity-40">
                                                                         <Icon name="camera" size={32} />
