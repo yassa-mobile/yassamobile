@@ -606,6 +606,29 @@ const maskAlamatKatalog = (alamatRaw) => {
                 keys.forEach(k => { localStorage.removeItem(k); localStorage.removeItem(k + '_exp'); });
             }
         }; 
+
+        // ============================================================
+        // 🔒 RESOLVE URL FOTO ANAK (PRIVAT)
+        // Foto anak sekarang disimpan PRIVAT di Drive (tidak di-share
+        // "anyone with link" -- domain Workspace yayasan membatasi itu).
+        // Nilai yang tersimpan di kolom FOTO ANAK berupa "GASIMG:<fileId>".
+        // Untuk menampilkannya, arahkan <img> ke endpoint doGet backend
+        // (action=getImage) yang WAJIB sessionToken valid milik pengurus
+        // yang sedang login -- jadi foto anak tetap tidak bisa diakses
+        // publik lewat internet.
+        // Link lama/manual (URL biasa, bukan "GASIMG:") tetap ditampilkan
+        // apa adanya demi kompatibilitas data lama.
+        // ============================================================
+        const resolveFotoUrl = (raw) => {
+            const v = String(raw || '').trim();
+            if (!v) return '';
+            if (v.startsWith('GASIMG:')) {
+                const fileId = v.slice('GASIMG:'.length);
+                const token = yassaStore.get('yassa-token') || '';
+                return `${URL_DATABASE_PERMANEN}?action=getImage&id=${encodeURIComponent(fileId)}&token=${encodeURIComponent(token)}`;
+            }
+            return v;
+        };
         
         // ============================================================
         // 🖼️ MODE EMBED — dipanggil dari YASSA Hub lewat iframe (?embed=1)
@@ -5877,7 +5900,7 @@ const submitArchiveChildren = async () => {
                                                                         <div className="flex items-start gap-3 print:gap-1.5">
                                                                             {getVal(c, 'FOTO ANAK') && (
                                                                                 <img 
-                                                                                    src={getVal(c, 'FOTO ANAK')} 
+                                                                                    src={resolveFotoUrl(getVal(c, 'FOTO ANAK'))} 
                                                                                     alt="Foto Anak" 
                                                                                     className={`object-cover shrink-0 bg-white ${!isSapaChild ? 'w-10 h-10 rounded-full border border-slate-200 print:hidden' : 'w-10 h-10 rounded-full border border-slate-200 print:w-10 print:h-10 print:rounded-md print:border-slate-300'}`} 
                                                                                     onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} 
@@ -7034,7 +7057,7 @@ const submitArchiveChildren = async () => {
                                                 <div key={i} className="border border-slate-300 rounded-xl p-3 flex gap-3 shadow-sm break-inside-avoid page-break-inside-avoid">
                                                     <div className="w-[3.5cm] h-[4.5cm] shrink-0">
                                                         {getVal(item, 'FOTO ANAK') ? (
-                                                            <img src={getVal(item, 'FOTO ANAK')} className="w-full h-full object-cover rounded-md border border-slate-200" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                            <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-full object-cover rounded-md border border-slate-200" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
                                                         ) : (
                                                             <div className="w-full h-full bg-slate-50 rounded-md border border-slate-200 flex items-center justify-center text-[8px] text-slate-300 font-bold text-center p-2">NO FOTO</div>
                                                         )}
@@ -7157,7 +7180,7 @@ const submitArchiveChildren = async () => {
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Anak</td>
                                                                         <td rowSpan={8} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center">
                                                                             {getVal(item, 'FOTO ANAK') ? (
-                                                                                <img src={getVal(item, 'FOTO ANAK')} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                                                <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
                                                                             ) : (
                                                                                 <div className="w-full h-[3.2cm] bg-slate-50 flex items-center justify-center text-[6pt] text-slate-300 font-bold text-center p-1">NO FOTO</div>
                                                                             )}
@@ -7493,7 +7516,7 @@ const submitArchiveChildren = async () => {
                                         return (
                                             <div key={i} className="bg-[#E0E5EC] p-5 rounded-[2rem] border-none flex justify-between items-center shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] gap-2">
                                                 {getVal(item, 'FOTO ANAK') && (
-                                                    <img src={getVal(item, 'FOTO ANAK')} alt="Foto" className={`w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-50 ${!isSapa ? 'print:hidden' : ''}`} onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                    <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} alt="Foto" className={`w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-50 ${!isSapa ? 'print:hidden' : ''}`} onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
                                                 )}
                                                 <div className="flex-1 min-w-0 pr-2">
                                                     <p className="font-black text-slate-800 text-sm uppercase truncate mb-1">{getVal(item, 'NAMA ANAK')}</p>
@@ -7732,7 +7755,7 @@ const submitArchiveChildren = async () => {
                                                                 <span className="text-[6px] font-black uppercase">PDF</span>
                                                             </a>
                                                         ) : fotoUtama ? (
-                                                            <img src={fotoUtama} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                                                            <img src={resolveFotoUrl(fotoUtama)} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-amber-400"><Icon name="award" size={22} /></div>
                                                         )}
@@ -9297,7 +9320,7 @@ const submitArchiveChildren = async () => {
                                                         <div className="w-full sm:w-[150px] flex flex-col items-center gap-3 shrink-0">
                                                             <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-[2rem] bg-white border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner group">
                                                                 {child['FOTO ANAK'] ? (
-                                                                    <img src={child['FOTO ANAK']} alt="Foto Anak" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.target.onerror = null; e.target.src = ''; }} />
+                                                                    <img src={resolveFotoUrl(child['FOTO ANAK'])} alt="Foto Anak" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.target.onerror = null; e.target.src = ''; }} />
                                                                 ) : (
                                                                     <div className="flex flex-col items-center opacity-40">
                                                                         <Icon name="camera" size={32} />
