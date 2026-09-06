@@ -2262,6 +2262,13 @@ const submitArchiveChildren = async () => {
             // STATE FILTER BARU (KELAS & JENJANG SEKOLAH MULTI-SELECT)
             const [filterKelas, setFilterKelas] = useState([]);
             const [filterJenjang, setFilterJenjang] = useState([]);
+            // 🆕 Filter Wilayah KHUSUS tab Katalog Anak -- MULTI-SELECT (centang lebih
+            // dari satu wilayah), supaya admin bisa pilih wilayah mana saja yang mau
+            // dicetak (Cetak Katalog / Cetak Anak Asuh) sekaligus dalam satu kali cetak.
+            // Sengaja dibuat state TERPISAH dari `filterWilayah` (yang dipakai tab
+            // Keluarga/Prestasi & berbagai laporan lain sebagai satu wilayah tunggal),
+            // supaya perubahan ini tidak menyentuh/mengubah perilaku fitur lain.
+            const [filterWilayahAnak, setFilterWilayahAnak] = useState([]);
 
             const [regionAnalysisFilter, setRegionAnalysisFilter] = useState('');
 
@@ -2491,13 +2498,13 @@ const submitArchiveChildren = async () => {
                     document.title = `Laporan YASSA ${activeWil} - ${printBulan}`;
                 } else if (tab === 'anak') {
                     const namaKategori = filterKategoriAnak ? filterKategoriAnak : 'Anak';
-                    const namaWilayah = filterWilayah ? filterWilayah : 'Semua Wilayah';
+                    const namaWilayah = filterWilayahAnak && filterWilayahAnak.length > 0 ? filterWilayahAnak.join(', ') : 'Semua Wilayah';
                     const namaProgram = filterProgram ? ` (${filterProgram})` : '';
                     document.title = `Katalog ${namaKategori}${namaProgram} - ${namaWilayah}`;
                 } else {
                     document.title = "YASSA Mobile - Official App";
                 }
-            }, [tab, viewMode, filterWilayah, filterKategoriAnak, filterProgram, printMonthInput, role, allowedRegions]);
+            }, [tab, viewMode, filterWilayah, filterWilayahAnak, filterKategoriAnak, filterProgram, printMonthInput, role, allowedRegions]);
             
             // STATE MODE TAMPILAN KELUARGA (LIST vs DETAIL)
             const [viewMode, setViewMode] = useState('list');
@@ -3787,7 +3794,7 @@ const submitArchiveChildren = async () => {
                 XLSX.utils.book_append_sheet(wb, ws, 'Katalog Anak');
 
                 const namaKategori = filterKategoriAnak ? filterKategoriAnak.replace(/\s+/g, '_') : 'SEMUA';
-                const namaWilayah = filterWilayah ? filterWilayah.toUpperCase().replace(/\s+/g, '_') : 'SEMUA_WILAYAH';
+                const namaWilayah = filterWilayahAnak && filterWilayahAnak.length > 0 ? filterWilayahAnak.join('_').toUpperCase().replace(/\s+/g, '_') : 'SEMUA_WILAYAH';
                 const tanggalFile = new Date().toISOString().slice(0, 10);
                 const namaFile = `Katalog_Anak_${namaKategori}_${namaWilayah}_${tanggalFile}.xlsx`;
 
@@ -3796,7 +3803,7 @@ const submitArchiveChildren = async () => {
                 sendLog(activeUser, role, userWilayah, `Export Excel Katalog Anak (Kategori: ${namaKategori}, ${rows.length} Anak)`);
                 setMsg(`✅ Excel Katalog berhasil diunduh! (${rows.length} Anak)`);
                 setTimeout(() => setMsg(""), 4000);
-            }, [filteredAnak, familyLookupMap, filterKategoriAnak, filterWilayah, activeUser, role, userWilayah]);
+            }, [filteredAnak, familyLookupMap, filterKategoriAnak, filterWilayahAnak, activeUser, role, userWilayah]);
 
             // 🔒 KONTROL SISTEM (TUTUP BUKU BULANAN) — isSuperAdminControl datang dari backend
             // (Code.gs, dikirim saat login), bukan dihitung dari daftar nomor HP di sini.
@@ -3848,11 +3855,14 @@ const submitArchiveChildren = async () => {
                         const w = parent ? (getVal(parent, 'WILAYAH') || '').toUpperCase() : '';
                         return allowedRegions.includes(w);
                     });
-                } else if (filterWilayah) {
+                } else if (filterWilayahAnak && filterWilayahAnak.length > 0) {
+                    // 🆕 MULTI-WILAYAH: cocok kalau wilayah keluarga anak ada di daftar
+                    // wilayah yang dicentang (bukan cuma satu wilayah tunggal lagi).
+                    const wilayahSet = filterWilayahAnak.map(w => w.toUpperCase());
                     result = result.filter(c => {
                         const parent = familyLookupMap[norm(getVal(c, 'ID_Keluarga'))];
                         const w = parent ? (getVal(parent, 'WILAYAH') || 'LAINNYA').trim().toUpperCase() : 'LAINNYA';
-                        return w === filterWilayah.toUpperCase();
+                        return wilayahSet.includes(w);
                     });
                 }
                 
@@ -3899,7 +3909,7 @@ const submitArchiveChildren = async () => {
 
                 if (searchQuery) result = result.filter(c => (getVal(c, 'NAMA ANAK') || '').toLowerCase().includes(searchQuery.toLowerCase()));
                 return result;
-            }, [data.anak, familyLookupMap, searchQuery, filterProgram, filterWilayah, filterKategoriAnak, filterKelas, filterJenjang, filterOta, role, allowedRegions]);
+            }, [data.anak, familyLookupMap, searchQuery, filterProgram, filterWilayahAnak, filterKategoriAnak, filterKelas, filterJenjang, filterOta, role, allowedRegions]);
 
             // 🏆 [BARU] DAFTAR PRESTASI ANAK — join sheet Prestasi_Anak dengan Anak (+ wilayah keluarga),
             // dibatasi wilayah untuk role korwil sama seperti filteredAnak, dan bisa difilter dari UI.
@@ -7229,7 +7239,7 @@ const submitArchiveChildren = async () => {
                                     <div className="text-center mb-6">
                                         <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Katalog Profil Anak</h2>
                                         <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
-                                            Wilayah: {filterWilayah || 'SEMUA'} • Program: {filterProgram || 'SEMUA'} • Kategori: {filterKategoriAnak || 'SEMUA'}
+                                            Wilayah: {filterWilayahAnak.length > 0 ? filterWilayahAnak.join(', ') : 'SEMUA'} • Program: {filterProgram || 'SEMUA'} • Kategori: {filterKategoriAnak || 'SEMUA'}
                                             {filterJenjang.length > 0 ? ` • Jenjang: ${filterJenjang.join(', ')}` : ''}
                                             {filterKelas.length > 0 ? ` • Kelas: ${filterKelas.join(', ')}` : ''}
                                             <br/> Total: {filteredAnak.length} Anak
@@ -7341,7 +7351,7 @@ const submitArchiveChildren = async () => {
                                                 <div className="text-center mb-6">
                                                     <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Data Santunan Anak Asuh {bulanLabel}</h2>
                                                     <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
-                                                        Wilayah: {filterWilayah || 'SEMUA'}{filterOta ? ` • OTA: ${filterOta}` : ''}
+                                                        Wilayah: {filterWilayahAnak.length > 0 ? filterWilayahAnak.join(', ') : 'SEMUA'}{filterOta ? ` • OTA: ${filterOta}` : ''}
                                                         <br/> Total Anak Asuh Aktif: {anakAsuhList.length}
                                                     </p>
                                                 </div>
@@ -7541,7 +7551,7 @@ const submitArchiveChildren = async () => {
                                                         const originalTitle = document.title;
                                                         
                                                         const namaKategori = filterKategoriAnak ? filterKategoriAnak : 'Anak';
-                                                        const namaWilayah = filterWilayah ? filterWilayah : 'Semua Wilayah';
+                                                        const namaWilayah = filterWilayahAnak && filterWilayahAnak.length > 0 ? filterWilayahAnak.join(', ') : 'Semua Wilayah';
                                                         const namaProgram = filterProgram ? ` (${filterProgram})` : '';
                                                         
                                                         const newTitle = `Katalog ${namaKategori}${namaProgram} - ${namaWilayah}`;
@@ -7592,7 +7602,7 @@ const submitArchiveChildren = async () => {
                                                         const scrollArea = document.getElementById('scroll-area');
                                                         const originalTitle = document.title;
                                                         
-                                                        const namaWilayah = filterWilayah ? filterWilayah : 'Semua Wilayah';
+                                                        const namaWilayah = filterWilayahAnak && filterWilayahAnak.length > 0 ? filterWilayahAnak.join(', ') : 'Semua Wilayah';
                                                         const bulanLabel = printMonthInput ? printMonthInput.toUpperCase() : new Date().toLocaleDateString('id-ID', {month: 'long', year: 'numeric'}).toUpperCase();
                                                         
                                                         const newTitle = `Data Santunan Anak Asuh ${bulanLabel} - ${namaWilayah}`;
@@ -7633,15 +7643,13 @@ const submitArchiveChildren = async () => {
                                             
                                             <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
                                                 {(role === 'admin' || role === 'pengurus' || (role === 'korwil' && allowedRegions.length > 1)) ? (
-                                                    <select 
-                                                        className="bg-[#E0E5EC] border-none px-4 py-3.5 flex-1 min-w-[120px] rounded-2xl text-[10px] sm:text-xs font-black outline-none focus:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)] text-sky-600 truncate transition-all cursor-pointer"
-                                                        value={filterWilayah}
-                                                        onChange={e => setFilterWilayah(e.target.value)}
-                                                    >
-                                                        <option value="">Semua Wilayah</option>
-                                                        {(role === 'admin' || role === 'pengurus' ? KELUARGA_FIELDS.find(f => f.key === 'WILAYAH').options : allowedRegions).map(o => <option key={o} value={o}>{o}</option>)}
-                                                        {(role === 'admin' || role === 'pengurus') && <option value="LAINNYA">⚠️ LAINNYA</option>}
-                                                    </select>
+                                                    <MultiSelectFilter
+                                                        theme="slate"
+                                                        label="Pilih Wilayah"
+                                                        options={role === 'admin' || role === 'pengurus' ? [...KELUARGA_FIELDS.find(f => f.key === 'WILAYAH').options, 'LAINNYA'] : allowedRegions}
+                                                        selectedVals={filterWilayahAnak}
+                                                        onChange={setFilterWilayahAnak}
+                                                    />
                                                 ) : (
                                                     <div className="bg-[#E0E5EC] border-none text-sky-600 px-4 py-3.5 flex-1 min-w-[120px] rounded-2xl text-[10px] sm:text-xs font-black uppercase flex items-center justify-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] truncate">{userWilayah}</div>
                                                 )}
