@@ -875,6 +875,37 @@ const maskAlamatKatalog = (alamatRaw) => {
             return foundKey ? String(obj[foundKey] || "") : "";
         };
 
+        // 🔒 [SENSOR PUBLIK] Dipakai khusus untuk Export Excel "Data Anak" versi
+        // publik/laporan -- alamat hanya disisakan level Kecamatan/Kabupaten/Kota
+        // ke atas, dan tanggal lahir hanya disisakan Bulan-Tahun.
+        const censorAlamatPublik = (alamat) => {
+            if (!alamat) return '-';
+            const teks = String(alamat);
+            const match = teks.match(/(KEC\.?\s|KECAMATAN\s|KAB\.?\s|KABUPATEN\s|KOTA\s).*/i);
+            if (match) return match[0].trim();
+            const kata = teks.trim().split(/\s+/).filter(Boolean);
+            return kata.length ? kata.slice(Math.max(kata.length - 2, 0)).join(' ') : '-';
+        };
+
+        const censorTanggalLahirPublik = (tgl) => {
+            if (!tgl) return '-';
+            const teks = String(tgl).trim();
+            const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            let m = teks.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); // DD-MM-YYYY / DD/MM/YYYY
+            if (m) {
+                const bln = parseInt(m[2], 10) - 1;
+                if (bln >= 0 && bln < 12) return `${namaBulan[bln]} ${m[3]}`;
+            }
+            m = teks.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/); // YYYY-MM-DD
+            if (m) {
+                const bln = parseInt(m[2], 10) - 1;
+                if (bln >= 0 && bln < 12) return `${namaBulan[bln]} ${m[1]}`;
+            }
+            const d = new Date(teks);
+            if (!isNaN(d.getTime())) return `${namaBulan[d.getMonth()]} ${d.getFullYear()}`;
+            return teks; // format tak dikenali, tampilkan apa adanya
+        };
+
         // 🏆 [BARU] Satu sel FOTO_PIAGAM bisa menampung BEBERAPA link foto/PDF,
         // dipisah karakter "|" (dipilih karena tidak pernah muncul di URL Drive).
         const parseFotoList = (str) => (str || '').split('|').map(s => s.trim()).filter(Boolean);
@@ -3775,28 +3806,32 @@ const submitArchiveChildren = async () => {
                     return;
                 }
 
+                // 🔒 Export versi PUBLIK/laporan: hanya 9 kolom ini, alamat & tanggal
+                // lahir disensor. Jangan tambah kolom lain (NIK, rekening, dll) di sini.
                 const rows = filteredAnak.map(item => {
                     const parent = familyLookupMap[norm(getVal(item, 'ID_Keluarga'))];
-                    const row = {
-                        'ID_Keluarga': getVal(item, 'ID_Keluarga') || '',
+                    return {
                         'WILAYAH': parent ? (getVal(parent, 'WILAYAH') || '-') : '-',
                         'NAMA ALM': parent ? (getVal(parent, 'NAMA ALM') || '-') : '-',
-                        'NAMA IBU': parent ? (getVal(parent, 'NAMA IBU') || '-') : '-',
-                        'ALAMAT': parent ? (getVal(parent, 'ALAMAT') || '-') : '-',
+                        'ALAMAT': censorAlamatPublik(parent ? getVal(parent, 'ALAMAT') : ''),
+                        'NAMA ANAK': getVal(item, 'NAMA ANAK') || '-',
+                        'TANGGAL LAHIR': censorTanggalLahirPublik(getVal(item, 'TANGGAL LAHIR')),
+                        'KELAS': getVal(item, 'KELAS') || '-',
+                        'JENJANG SEKOLAH': getVal(item, 'JENJANG SEKOLAH') || '-',
+                        'NAMA SEKOLAH': getVal(item, 'NAMA SEKOLAH') || '-',
+                        'JENIS DISABILITAS': getVal(item, 'JENIS DISABILITAS') || '-',
                     };
-                    ANAK_FIELDS.forEach(fld => { row[fld.key] = getVal(item, fld.key) || ''; });
-                    return row;
                 });
-                const header = ['ID_Keluarga', 'WILAYAH', 'NAMA ALM', 'NAMA IBU', 'ALAMAT', ...ANAK_FIELDS.map(f => f.key)];
+                const header = ['WILAYAH', 'NAMA ALM', 'ALAMAT', 'NAMA ANAK', 'TANGGAL LAHIR', 'KELAS', 'JENJANG SEKOLAH', 'NAMA SEKOLAH', 'JENIS DISABILITAS'];
 
                 const wb = XLSX.utils.book_new();
                 const ws = XLSX.utils.json_to_sheet(rows, { header });
-                XLSX.utils.book_append_sheet(wb, ws, 'Katalog Anak');
+                XLSX.utils.book_append_sheet(wb, ws, 'Data Anak (Publik)');
 
                 const namaKategori = filterKategoriAnak ? filterKategoriAnak.replace(/\s+/g, '_') : 'SEMUA';
                 const namaWilayah = filterWilayahAnak && filterWilayahAnak.length > 0 ? filterWilayahAnak.join('_').toUpperCase().replace(/\s+/g, '_') : 'SEMUA_WILAYAH';
                 const tanggalFile = new Date().toISOString().slice(0, 10);
-                const namaFile = `Katalog_Anak_${namaKategori}_${namaWilayah}_${tanggalFile}.xlsx`;
+                const namaFile = `Data_Anak_Publik_${namaKategori}_${namaWilayah}_${tanggalFile}.xlsx`;
 
                 XLSX.writeFile(wb, namaFile);
 
