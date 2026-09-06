@@ -2513,6 +2513,11 @@ const submitArchiveChildren = async () => {
             // anak formnya punya accordion sendiri-sendiri.
             const [openProfilGroup, setOpenProfilGroup] = useState(0);
             const [openAnakGroup, setOpenAnakGroup] = useState({});
+            // 🆕 Pelacak mode "tulis manual" untuk field JENIS DISABILITAS ketika
+            // opsi "Lainnya" dipilih -- { [indexAnak]: true/false }. Terpisah dari
+            // data anak sendiri (regChildren) karena ini cuma status tampilan UI,
+            // bukan data yang disimpan ke sheet.
+            const [disabilitasLainnyaManual, setDisabilitasLainnyaManual] = useState({});
             const [errorMsg, setErrorMsg] = useState('');
             const [uploadingImageIdx, setUploadingImageIdx] = useState(null);
 
@@ -4066,7 +4071,7 @@ const submitArchiveChildren = async () => {
                 // mana yang langsung dibuka duluan, bukan tab yang berbeda lagi.
                 const GROUP_INDEX_BY_STARTTAB = { profil: 0, rekening: 4 };
                 setOpenProfilGroup(startTab in GROUP_INDEX_BY_STARTTAB ? GROUP_INDEX_BY_STARTTAB[startTab] : 0);
-                setOpenAnakGroup({});
+                setOpenAnakGroup({}); setDisabilitasLainnyaManual({});
                 // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
                 if (role !== 'admin') {
                     setRegFamily(f);
@@ -4085,7 +4090,7 @@ const submitArchiveChildren = async () => {
 
             const openEditChild = (c) => {
                 // 🆕 Reset accordion form Anak biar mulai dari kelompok pertama
-                setOpenAnakGroup({});
+                setOpenAnakGroup({}); setDisabilitasLainnyaManual({});
                 // 🔒 PROTEKSI: hanya admin yang boleh membuka mode edit, selain admin dipaksa mode view
                 if (role !== 'admin') {
                     setRegChildren([c]); setRegModal({ open: true, step: 2, mode: 'view' }); setErrorMsg('');
@@ -5049,7 +5054,7 @@ const submitArchiveChildren = async () => {
                         <div className="flex gap-2">
                              <button onClick={toggleDarkMode} className="p-3 bg-slate-50 rounded-2xl transition-all text-slate-400" title={darkMode ? 'Mode Standar' : 'Mode Malam'}><Icon name={darkMode ? 'sun' : 'moon'} size={18} /></button>
                              <button onClick={refresh} className={`p-3 bg-slate-50 rounded-2xl transition-all ${loading ? "animate-spin text-green-600" : "text-slate-400"}`}><Icon name="refresh-cw" size={18} /></button>
-                             {role === 'admin' && <button onClick={() => { setRegFamily({}); setRegChildren([]); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }} className="p-3 bg-green-600 text-white rounded-2xl shadow-lg btn-active transition-all"><Icon name="plus-circle" size={18} /></button>}
+                             {role === 'admin' && <button onClick={() => { setRegFamily({}); setRegChildren([]); setOpenProfilGroup(0); setOpenAnakGroup({}); setDisabilitasLainnyaManual({}); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }} className="p-3 bg-green-600 text-white rounded-2xl shadow-lg btn-active transition-all"><Icon name="plus-circle" size={18} /></button>}
                         </div>
                     </header>
                     )}
@@ -5532,7 +5537,7 @@ const submitArchiveChildren = async () => {
 
                                 {role === 'admin' && (
                                     <button
-                                        onClick={() => { setRegFamily({}); setRegChildren([]); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }}
+                                        onClick={() => { setRegFamily({}); setRegChildren([]); setOpenProfilGroup(0); setOpenAnakGroup({}); setDisabilitasLainnyaManual({}); setRegModal({ open: true, step: 1, mode: 'add' }); setErrorMsg(''); }}
                                         className="w-full bg-[#E0E5EC] border-none rounded-[2rem] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] active:shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] active:scale-[0.98] transition-all p-6 flex items-center gap-5 text-left"
                                     >
                                         <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#E0E5EC] flex items-center justify-center shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)]">
@@ -5980,7 +5985,7 @@ const submitArchiveChildren = async () => {
                                                         {role === 'admin' ? (
                                                             <button onClick={() => openEditFamily(item)} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-slate-500 hover:text-green-600 active:scale-95 transition-all outline-none"><Icon name="edit" size={16} /></button>
                                                         ) : (
-                                                            <button onClick={() => { setRegFamily(item); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-blue-500 hover:text-blue-600 active:scale-95 transition-all outline-none"><Icon name="eye" size={16} /></button>
+                                                            <button onClick={() => { setRegFamily(item); setOpenProfilGroup(0); setOpenAnakGroup({}); setDisabilitasLainnyaManual({}); setRegModal({ open: true, step: 1, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] rounded-xl text-blue-500 hover:text-blue-600 active:scale-95 transition-all outline-none"><Icon name="eye" size={16} /></button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -6040,7 +6045,7 @@ const submitArchiveChildren = async () => {
                                                         {role === 'admin' ? (
                                                             <button onClick={() => openEditFamily(item)} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-green-600'}`}><Icon name="edit" size={14} /></button>
                                                         ) : (
-                                                            <button onClick={() => { setRegFamily(item); setOpenProfilGroup(0); setOpenAnakGroup({}); setRegModal({ open: true, step: 1, mode: 'view' }); }} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-blue-50 border-blue-100 text-blue-500 hover:bg-blue-100'}`}><Icon name="eye" size={14} /></button>
+                                                            <button onClick={() => { setRegFamily(item); setOpenProfilGroup(0); setOpenAnakGroup({}); setDisabilitasLainnyaManual({}); setRegModal({ open: true, step: 1, mode: 'view' }); }} className={`p-2 rounded-xl transition-all shadow-sm border ${isSelected ? 'bg-white/50 border-white/40 text-blue-800 hover:bg-white/80' : 'bg-blue-50 border-blue-100 text-blue-500 hover:bg-blue-100'}`}><Icon name="eye" size={14} /></button>
                                                         )}
                                                     </div>
 
@@ -7807,7 +7812,7 @@ const submitArchiveChildren = async () => {
                                                     {role === 'admin' ? (
                                                         <button onClick={() => openEditChild(item)} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-slate-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] active:text-green-600 transition-all"><Icon name="edit" size={16} /></button>
                                                     ) : (
-                                                        <button onClick={() => { setOpenAnakGroup({}); setRegChildren([item]); setRegModal({ open: true, step: 2, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-blue-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="eye" size={16} /></button>
+                                                        <button onClick={() => { setOpenAnakGroup({}); setDisabilitasLainnyaManual({}); setRegChildren([item]); setRegModal({ open: true, step: 2, mode: 'view' }); }} className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-blue-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="eye" size={16} /></button>
                                                     )}
                                                     {role === 'admin' && (
                                                         <button onClick={() => openAddPrestasi(item)} title="Tambah Prestasi" className="p-3 bg-[#E0E5EC] border-none rounded-2xl text-amber-500 shadow-[4px_4px_8px_rgb(163,177,198,0.6),-4px_-4px_8px_rgba(255,255,255,0.8)] active:shadow-[inset_2px_2px_4px_rgb(163,177,198,0.6),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] transition-all"><Icon name="award" size={16} /></button>
@@ -9576,6 +9581,63 @@ const submitArchiveChildren = async () => {
                                                                         <div key={f.key} className={f.type === 'textarea' ? "sm:col-span-2" : ""}>
                                                                             <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest mb-1.5 block">{f.label}</label>
                                                                             {f.type === 'select' ? (
+                                                                                f.key.toUpperCase() === 'JENIS DISABILITAS' ? (() => {
+                                                                                    // 🆕 Opsi "Lainnya" -- kalau dipilih, tampilkan kotak teks
+                                                                                    // supaya pengurus bisa tulis manual jenis disabilitas yang
+                                                                                    // tidak ada di daftar baku. Deteksi mode manual dari DUA hal:
+                                                                                    // (1) flag disabilitasLainnyaManual (baru saja klik "Lainnya"),
+                                                                                    // atau (2) data yang sudah tersimpan bukan salah satu opsi baku
+                                                                                    // (data lama/hasil isian manual sebelumnya saat mode 'view'/'edit').
+                                                                                    const curVal = (child[f.key] || '').toUpperCase();
+                                                                                    const opsiBaku = f.options.map(o => String(o).toUpperCase());
+                                                                                    const cocokOpsiBaku = opsiBaku.includes(curVal);
+                                                                                    const modeManual = !!disabilitasLainnyaManual[i] || (curVal !== '' && !cocokOpsiBaku);
+
+                                                                                    return (
+                                                                                        <>
+                                                                                            <select
+                                                                                                value={modeManual ? 'LAINNYA' : (cocokOpsiBaku ? curVal : '')}
+                                                                                                onChange={e => {
+                                                                                                    const val = e.target.value;
+                                                                                                    if (val === 'LAINNYA') {
+                                                                                                        // Baru pilih "Lainnya": kosongkan supaya siap ditulis manual
+                                                                                                        // (kecuali sebelumnya memang sudah teks manual, biarkan tetap).
+                                                                                                        setDisabilitasLainnyaManual({ ...disabilitasLainnyaManual, [i]: true });
+                                                                                                        if (cocokOpsiBaku) {
+                                                                                                            const nc = [...regChildren];
+                                                                                                            nc[i] = { ...nc[i], [f.key]: '' };
+                                                                                                            setRegChildren(nc);
+                                                                                                        }
+                                                                                                    } else {
+                                                                                                        setDisabilitasLainnyaManual({ ...disabilitasLainnyaManual, [i]: false });
+                                                                                                        const nc = [...regChildren];
+                                                                                                        nc[i] = { ...nc[i], [f.key]: val };
+                                                                                                        setRegChildren(nc);
+                                                                                                    }
+                                                                                                }}
+                                                                                                disabled={regModal.mode === 'view'}
+                                                                                                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 shadow-sm transition-all disabled:opacity-50"
+                                                                                            >
+                                                                                                <option value="">-- Pilih --</option>
+                                                                                                {f.options.map(o => <option key={o} value={String(o).toUpperCase()}>{o}</option>)}
+                                                                                            </select>
+                                                                                            {modeManual && (
+                                                                                                <input
+                                                                                                    type="text"
+                                                                                                    value={child[f.key] || ''}
+                                                                                                    onChange={e => {
+                                                                                                        const nc = [...regChildren];
+                                                                                                        nc[i] = { ...nc[i], [f.key]: e.target.value.toUpperCase() };
+                                                                                                        setRegChildren(nc);
+                                                                                                    }}
+                                                                                                    disabled={regModal.mode === 'view'}
+                                                                                                    placeholder="Tulis jenis disabilitas lainnya..."
+                                                                                                    className="w-full mt-2 bg-white border border-slate-200 px-4 py-3.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 shadow-sm transition-all disabled:opacity-50"
+                                                                                                />
+                                                                                            )}
+                                                                                        </>
+                                                                                    );
+                                                                                })() : (
                                                                                 <select
                                                                                     value={child[f.key] || ''}
                                                                                     onChange={e => {
@@ -9589,6 +9651,7 @@ const submitArchiveChildren = async () => {
                                                                                     <option value="">-- Pilih --</option>
                                                                                     {f.options.map(o => <option key={o} value={String(o).toUpperCase()}>{o}</option>)}
                                                                                 </select>
+                                                                            )
                                                                             ) : (
                                                                                 <input
                                                                                     // PERUBAHAN: Tipe input khusus NIK ANAK diubah ke text
