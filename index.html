@@ -631,6 +631,27 @@ const maskAlamatKatalog = (alamatRaw) => {
         };
 
         // ============================================================
+        // 🩹 [BARU] FALLBACK KALAU FOTO GAGAL DIMUAT SAAT CETAK
+        // ------------------------------------------------------------
+        // Chrome/Edge kadang membatalkan paksa <img> yang masih loading
+        // begitu window.print() dipanggil, supaya jendela Print langsung
+        // terbuka -- ini memicu event 'error' pada foto walau sebenarnya
+        // bukan salah foto/server. Sebelumnya onError langsung menyembunyikan
+        // foto (display:none), dan karena bingkai/border menempel di <img>
+        // itu sendiri (bukan di pembungkus luarnya), seluruh kotak foto ikut
+        // hilang tanpa bekas dari hasil cetak.
+        //
+        // Fix: JANGAN disembunyikan. Ganti src-nya dengan gambar inisial nama
+        // anak (layanan UI-Avatars) supaya bingkai & tata letak tetap berdiri
+        // -- hasil cetak tetap rapi walau satu-dua foto kebetulan gagal dimuat.
+        // ============================================================
+        const handleFotoImgError = (e, namaAnak) => {
+            e.target.onerror = null;
+            const nama = (namaAnak || '').toString().trim() || 'Anak';
+            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=E0E5EC&color=475569&bold=true&size=128`;
+        };
+
+        // ============================================================
         // 🩹 [BARU] KONVERSI FOTO PROXY (GASIMG) JADI data: URL SEBELUM CETAK
         // ------------------------------------------------------------
         // Foto anak yang lewat proxy backend (?action=getImage&id=...&token=...)
@@ -5999,7 +6020,7 @@ const submitArchiveChildren = async () => {
                                                                                     src={resolveFotoUrl(getVal(c, 'FOTO ANAK'))} 
                                                                                     alt="Foto Anak" 
                                                                                     className={`object-cover shrink-0 bg-white ${!isSapaChild ? 'w-10 h-10 rounded-full border border-slate-200 print:hidden' : 'w-10 h-10 rounded-full border border-slate-200 print:w-10 print:h-10 print:rounded-md print:border-slate-300'}`} 
-                                                                                    onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} 
+                                                                                    onError={(e)=>handleFotoImgError(e, getVal(c, 'NAMA ANAK'))} 
                                                                                 />
                                                                             )}
                                                                             <div className="flex-1 min-w-0">
@@ -7151,9 +7172,9 @@ const submitArchiveChildren = async () => {
 
                                             return (
                                                 <div key={i} className="border border-slate-300 rounded-xl p-3 flex gap-3 shadow-sm break-inside-avoid page-break-inside-avoid">
-                                                    <div className="w-[3.5cm] h-[4.5cm] shrink-0">
+                                                    <div className="w-[3.5cm] h-[4.5cm] shrink-0" style={{minWidth:'3.5cm', minHeight:'4.5cm', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
                                                         {getVal(item, 'FOTO ANAK') ? (
-                                                            <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-full object-cover rounded-md border border-slate-200" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                            <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-full object-cover rounded-md border border-slate-200" onError={(e)=>handleFotoImgError(e, getVal(item, 'NAMA ANAK'))} />
                                                         ) : (
                                                             <div className="w-full h-full bg-slate-50 rounded-md border border-slate-200 flex items-center justify-center text-[8px] text-slate-300 font-bold text-center p-2">NO FOTO</div>
                                                         )}
@@ -7274,9 +7295,9 @@ const submitArchiveChildren = async () => {
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Orang Tua Asuh</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Orang Tua / Wali</td>
                                                                         <td colSpan={2} className="border border-slate-800 p-1 font-black uppercase bg-slate-100 text-[7pt]">Data Anak</td>
-                                                                        <td rowSpan={8} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center">
+                                                                        <td rowSpan={8} className="border border-slate-800 w-[2.6cm] p-1 align-middle text-center" style={{minWidth:'2.6cm', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
                                                                             {getVal(item, 'FOTO ANAK') ? (
-                                                                                <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                                                <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} className="w-full h-[3.2cm] object-cover rounded-sm mx-auto" style={{minHeight:'3.2cm'}} onError={(e)=>handleFotoImgError(e, getVal(item, 'NAMA ANAK'))} />
                                                                             ) : (
                                                                                 <div className="w-full h-[3.2cm] bg-slate-50 flex items-center justify-center text-[6pt] text-slate-300 font-bold text-center p-1">NO FOTO</div>
                                                                             )}
@@ -7616,7 +7637,7 @@ const submitArchiveChildren = async () => {
                                         return (
                                             <div key={i} className="bg-[#E0E5EC] p-5 rounded-[2rem] border-none flex justify-between items-center shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] gap-2">
                                                 {getVal(item, 'FOTO ANAK') && (
-                                                    <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} alt="Foto" className={`w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-50 ${!isSapa ? 'print:hidden' : ''}`} onError={(e)=>{e.target.onerror=null; e.target.style.display='none';}} />
+                                                    <img src={resolveFotoUrl(getVal(item, 'FOTO ANAK'))} alt="Foto" className={`w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 bg-slate-50 ${!isSapa ? 'print:hidden' : ''}`} onError={(e)=>handleFotoImgError(e, getVal(item, 'NAMA ANAK'))} />
                                                 )}
                                                 <div className="flex-1 min-w-0 pr-2">
                                                     <p className="font-black text-slate-800 text-sm uppercase truncate mb-1">{getVal(item, 'NAMA ANAK')}</p>
