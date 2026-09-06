@@ -6983,10 +6983,6 @@ const submitArchiveChildren = async () => {
                                             const alamat = parent ? getVal(parent, 'ALAMAT') : '-';
                                             const wilayah = parent ? getVal(parent, 'WILAYAH') : '-';
                                             
-                                            const rekeningParent = parent ? getVal(parent, 'REKENING') : '-';
-                                            const bankParent = parent ? getVal(parent, 'BANK') : '-';
-                                            const pemilikParent = parent ? getVal(parent, 'PEMILIK') : getVal(parent, 'NAMA IBU');
-
                                             const statusSekolah = (getVal(item, 'SEKOLAH') || '').toUpperCase();
                                             const isTidakSekolah = statusSekolah.includes('BELUM') || statusSekolah.includes('TIDAK');
                                             const pendidikanStr = isTidakSekolah 
@@ -7017,8 +7013,6 @@ const submitArchiveChildren = async () => {
                                                             <span className="font-bold">Nama Ibu</span><span>:</span><span className="uppercase font-bold text-slate-800">{namaIbu}</span>
                                                             <span className="font-bold">Wilayah</span><span>:</span><span className="uppercase">{wilayah}</span>
                                                             <span className="font-bold">Alamat</span><span>:</span><span className="leading-tight uppercase">{alamat}</span>
-                                                            <span className="font-bold mt-1.5 text-slate-800">Transfer</span><span className="mt-1.5 text-slate-800">:</span><span className="mt-1.5 font-black text-slate-900 uppercase">{bankParent} - {rekeningParent}</span>
-                                                            <span className="font-bold text-slate-800">A/N</span><span className="text-slate-800">:</span><span className="text-slate-800 uppercase font-bold">{pemilikParent || '-'}</span>
                                                         </div>
                                                     </div>
                                                 </div>
