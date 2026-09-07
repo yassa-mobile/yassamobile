@@ -1104,7 +1104,7 @@ const maskAlamatKatalog = (alamatRaw) => {
         };
 
         // KOMPONEN MULTI SELECT (Untuk filter bisa lebih dari 1) (Gaya Neumorphism)
-            const MultiSelectFilter = ({ label, options, selectedVals, onChange, theme = 'slate' }) => {
+            const MultiSelectFilter = ({ label, options, selectedVals, onChange, theme = 'slate', showSelectAll = false, selectAllLabel = 'SEMUA WILAYAH' }) => {
                 const [isOpen, setIsOpen] = useState(false);
                 const dropdownRef = useRef(null);
 
@@ -1123,6 +1123,13 @@ const maskAlamatKatalog = (alamatRaw) => {
                     else onChange([...selectedVals, val]);
                 };
 
+                // 🆕 "SEMUA WILAYAH" bersifat eksklusif: mencentangnya akan
+                // menghapus semua centang wilayah lainnya, dan otomatis jadi
+                // pilihan default (tercentang) selama belum ada wilayah
+                // spesifik yang dipilih.
+                const isAllSelected = selectedVals.length === 0;
+                const selectAll = () => onChange([]);
+
                 // Penyederhanaan warna tulisan agar serasi dengan Neumorphism
                 const themes = {
                     slate: { text: 'text-slate-600', checkbox: 'text-slate-600 focus:ring-slate-500' },
@@ -1134,11 +1141,17 @@ const maskAlamatKatalog = (alamatRaw) => {
                 return (
                     <div className="relative flex-1 min-w-[120px]" ref={dropdownRef}>
                         <div onClick={() => setIsOpen(!isOpen)} className={`bg-[#E0E5EC] border-none px-4 py-3.5 rounded-2xl text-[10px] sm:text-xs font-black outline-none cursor-pointer flex justify-between items-center transition-all ${isOpen ? 'shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'shadow-[6px_6px_12px_rgb(163,177,198,0.6),-6px_-6px_12px_rgba(255,255,255,0.8)]'} ${t.text} truncate`}>
-                            <span className="truncate">{selectedVals.length > 0 ? `${label} (${selectedVals.length})` : label}</span>
+                            <span className="truncate">{showSelectAll && isAllSelected ? selectAllLabel : (selectedVals.length > 0 ? `${label} (${selectedVals.length})` : label)}</span>
                             <span className="text-[10px] ml-2 opacity-60">{isOpen ? '▲' : '▼'}</span>
                         </div>
                         {isOpen && (
                             <div className="absolute z-[100] top-full mt-3 left-0 w-full min-w-[160px] bg-[#E0E5EC] border-none shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] rounded-2xl max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
+                                {showSelectAll && (
+                                    <label className="flex items-center gap-3 p-3 hover:bg-[#d1d9e6] rounded-xl cursor-pointer text-[10px] sm:text-[11px] text-slate-700 font-black break-words transition-colors border-b border-slate-400/40 mb-1 pb-3">
+                                        <input type="checkbox" checked={isAllSelected} onChange={selectAll} className={`rounded ${t.checkbox} w-4 h-4 cursor-pointer`} />
+                                        {selectAllLabel}
+                                    </label>
+                                )}
                                 {options.length === 0 && <div className="text-[10px] p-3 text-slate-400 text-center italic font-bold">Tidak ada opsi</div>}
                                 {options.map(opt => (
                                     <label key={opt} className="flex items-center gap-3 p-3 hover:bg-[#d1d9e6] rounded-xl cursor-pointer text-[10px] sm:text-[11px] text-slate-700 font-bold break-words transition-colors">
@@ -7769,6 +7782,8 @@ const submitArchiveChildren = async () => {
                                                         options={role === 'admin' || role === 'pengurus' ? [...KELUARGA_FIELDS.find(f => f.key === 'WILAYAH').options, 'LAINNYA'] : allowedRegions}
                                                         selectedVals={filterWilayahAnak}
                                                         onChange={setFilterWilayahAnak}
+                                                        showSelectAll={true}
+                                                        selectAllLabel="SEMUA WILAYAH"
                                                     />
                                                 ) : (
                                                     <div className="bg-[#E0E5EC] border-none text-sky-600 px-4 py-3.5 flex-1 min-w-[120px] rounded-2xl text-[10px] sm:text-xs font-black uppercase flex items-center justify-center shadow-[inset_4px_4px_8px_rgb(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] truncate">{userWilayah}</div>
