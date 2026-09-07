@@ -10141,6 +10141,14 @@ const submitArchiveChildren = async () => {
         notifyHubNotifStatus(permission); // 'denied' atau 'default'
         return;
       }
+
+      // 🩹 FIX: lapor "granted" ke Hub SEGERA setelah izin browser di-Allow.
+      // Gate di Hub cuma soal izin browser, bukan soal sukses/gagalnya
+      // subscribe FCM ke server -- jangan sampai sinyal lemah / GAS cold
+      // start bikin user nyangkut minta izin berulang-ulang padahal
+      // izinnya sudah beneran granted.
+      notifyHubNotifStatus('granted');
+
       const token = await messaging.getToken({
         vapidKey: (typeof YASSA_CONFIG !== 'undefined' ? YASSA_CONFIG.FCM_VAPID : 'BHIK0YI29D_A7VoUrVQ7kSbCe7BpGbYIvvZn0KX50a2CXWAfNubkRQlhKK3jDMOsKFYUL7mHKoQDh2XtsanW6KA'),
         serviceWorkerRegistration: await navigator.serviceWorker.ready
@@ -10148,13 +10156,14 @@ const submitArchiveChildren = async () => {
       if (token) {
         console.log('[FCM] Token berhasil didapat ✅');
         await subscribeToTopic(token, usernameParam);
-        notifyHubNotifStatus('granted');
       } else {
-        notifyHubNotifStatus('error');
+        console.log('[FCM] getToken() tidak mengembalikan token');
       }
     } catch (err) {
-      console.error('[FCM] Error init:', err);
-      notifyHubNotifStatus('error');
+      // Gagal di sini = gagal subscribe token ke server, BUKAN gagal izin.
+      // Izin tetap granted, gate Hub tetap kebuka. Login normal berikutnya
+      // akan otomatis coba subscribe ulang.
+      console.error('[FCM] Subscribe token gagal (izin tetap granted):', err);
     }
   }
 
