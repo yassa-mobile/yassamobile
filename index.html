@@ -663,17 +663,9 @@ var loadXlsxIfNeeded=()=>"undefined"!=typeof XLSX?Promise.resolve():new Promise(
 
   messaging.onMessage((payload) => {
     try {
-      const { title, body } = payload.notification;
-      if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title, {
-            body,
-            icon: '/yassamobile/icon-192.png',
-            badge: '/yassamobile/icon-192.png',
-            vibrate: [200, 100, 200]
-          });
-        });
-      }
+      console.log('Notifikasi diterima saat aplikasi aktif:', payload);
+      // Cukup tampilkan log di console atau bunyikan getar,
+      // jangan panggil reg.showNotification lagi karena Android/Chrome sudah menampilkannya otomatis.
     } catch (error) {
       console.error('[FCM] Error foreground:', error);
     }
