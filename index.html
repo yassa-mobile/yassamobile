@@ -5941,6 +5941,9 @@ const submitArchiveChildren = async () => {
                                                             // masih berjalan.
                                                             if (isPrintingBukuInduk) return;
                                                             setIsPrintingBukuInduk(true);
+                                                            // 🩹 [FIX] Paksa muat SEMUA data Keluarga (bukan cuma yg sudah
+                                                            // ke-load lewat "Muat Lebih Banyak") supaya PDF tidak terpotong.
+                                                            setVisibleItemsKeluarga(filteredKeluarga.length || ITEMS_PER_PAGE);
                                                             setMsg('🖨️ Menyiapkan file PDF...'); 
                                                             const body = document.body;
                                                             const mainApp = document.getElementById('main-app-container');
@@ -7656,6 +7659,9 @@ const submitArchiveChildren = async () => {
                                                         // tekanan tombol ini -- mencegah numpuknya banyak window.print().
                                                         if (isPrintingKatalogAnak) return;
                                                         setIsPrintingKatalogAnak(true);
+                                                        // 🩹 [FIX] Paksa muat SEMUA data Anak (bukan cuma yg sudah
+                                                        // ke-load lewat "Muat Lebih Banyak") supaya PDF tidak terpotong.
+                                                        setVisibleItemsAnak(filteredAnak.length || ITEMS_PER_PAGE);
                                                         setPrintModeAnak('katalog');
                                                         const body = document.body;
                                                         const mainApp = document.getElementById('main-app-container');
@@ -7721,6 +7727,9 @@ const submitArchiveChildren = async () => {
                                                         // masih berjalan (lihat catatan di tombol "Cetak Katalog").
                                                         if (isPrintingKatalogAnak) return;
                                                         setIsPrintingKatalogAnak(true);
+                                                        // 🩹 [FIX] Paksa muat SEMUA data Anak (bukan cuma yg sudah
+                                                        // ke-load lewat "Muat Lebih Banyak") supaya PDF tidak terpotong.
+                                                        setVisibleItemsAnak(filteredAnak.length || ITEMS_PER_PAGE);
                                                         setPrintModeAnak('anakAsuh');
                                                         const body = document.body;
                                                         const mainApp = document.getElementById('main-app-container');
