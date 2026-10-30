@@ -346,6 +346,33 @@ const maskAlamatKatalog = (alamatRaw) => {
     ];
 </script>
 
+<script>
+// 🟢 Wilayah NONAKTIF disembunyikan dari dropdown "Wilayah" (data tidak dihapus).
+// Daftar diambil dari backend Mobile (yang menariknya dari Hub > Pengaturan > Wilayah).
+(function () {
+  function terapkanWilayahNonaktif(daftar) {
+    if (!daftar || !daftar.length) return;
+    var off = {};
+    daftar.forEach(function (w) { off[String(w).toUpperCase()] = true; });
+    try {
+      var f = KELUARGA_FIELDS.find(function (x) { return x.key === 'WILAYAH'; });
+      if (f) f.options = f.options.filter(function (o) { return !off[String(o).toUpperCase()]; });
+    } catch (e) {}
+    window.WILAYAH_NONAKTIF = daftar;
+  }
+  var coba = 0;
+  (function muat() {
+    var siap = false;
+    try { siap = typeof postApi === 'function'; } catch (e) {}
+    if (!siap) { if (coba++ < 40) setTimeout(muat, 500); return; }
+    postApi({ action: 'getWilayahNonaktif' })
+      .then(function (res) { if (res && res.success) terapkanWilayahNonaktif(res.data); })
+      .catch(function () {});
+  })();
+})();
+</script>
+
+
     <!-- ====================================================================== -->
     <!-- KODE RESET PRINTER KHUSUS YASSA (Mencegah Halaman Meloncat)            -->
     <!-- ====================================================================== -->
