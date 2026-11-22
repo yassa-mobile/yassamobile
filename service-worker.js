@@ -6,7 +6,7 @@
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "1.1.41-NOTIF-BG-FIX";
+const SW_VERSION = "1.1.43";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
