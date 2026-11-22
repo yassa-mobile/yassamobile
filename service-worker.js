@@ -1,12 +1,12 @@
 // ============================================================
 // SERVICE WORKER - YASSA Mobile PWA
-// Versi: 1.1.46-NOTIF-BG-FIX
+// Versi: 1.1.47-NOTIF-BG-FIX
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "1.1.46";
+const SW_VERSION = "1.1.47";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
