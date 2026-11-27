@@ -1,12 +1,12 @@
 // ============================================================
 // SERVICE WORKER - YASSA Mobile PWA
-// Versi: 1.1.48-NOTIF-BG-FIX
+// Versi: 1.1.49-SPLIT-FILES
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "1.1.48";
+const SW_VERSION = "1.1.49";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
@@ -62,18 +62,21 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_NAME = 'yassa-cache-v10';
+const CACHE_NAME = 'yassa-cache-' + SW_VERSION;
 
 const STATIC_ASSETS = [
   '/yassamobile/',
   '/yassamobile/index.html',
   '/yassamobile/manifest.json',
   '/yassamobile/icon-192.png',
-  '/yassamobile/icon-512.png'
+  '/yassamobile/icon-512.png',
+  // File hasil pemisahan index.html (versi harus SAMA dengan ?v= di index.html)
+  '/yassamobile/app.js?v=' + SW_VERSION,
+  '/yassamobile/app.css?v=' + SW_VERSION
 ];
 
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v4...');
+  console.log('[SW] Installing', SW_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
@@ -85,7 +88,7 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating v4...');
+  console.log('[SW] Activating', SW_VERSION);
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
@@ -148,13 +151,6 @@ self.addEventListener('fetch', event => {
   );
 });
 
-self.addEventListener('message', event => {
-  if (event.data === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// ---- MESSAGE: Terima perintah dari app ----
 self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') {
     self.skipWaiting();
