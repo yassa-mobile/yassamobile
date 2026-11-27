@@ -1,12 +1,12 @@
 // ============================================================
 // SERVICE WORKER - YASSA Mobile PWA
-// Versi: 1.1.49-VITE-BUILD
+// Versi: 1.1.48-NOTIF-BG-FIX
 // URL: https://yassa-mobile.github.io/yassamobile/
 // ============================================================
 // 🚀 SUMBER TUNGGAL NOMOR VERSI APLIKASI (dibaca oleh index.html)
 // UBAH ANGKA INI SETIAP KALI ADA UPDATE — index.html akan otomatis
 // menampilkan angka yang sama di halaman login & menu profil.
-const SW_VERSION = "1.1.49";
+const SW_VERSION = "1.1.48";
 // ============================================================
 // ============================================================
 // FIREBASE MESSAGING SERVICE WORKER - YASSA Mobile
@@ -62,7 +62,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_NAME = 'yassa-cache-' + SW_VERSION;
+const CACHE_NAME = 'yassa-cache-v10';
 
 const STATIC_ASSETS = [
   '/yassamobile/',
@@ -73,7 +73,7 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  console.log('[SW] Installing', SW_VERSION);
+  console.log('[SW] Installing v4...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
@@ -85,7 +85,7 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating', SW_VERSION);
+  console.log('[SW] Activating v4...');
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
@@ -148,6 +148,13 @@ self.addEventListener('fetch', event => {
   );
 });
 
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// ---- MESSAGE: Terima perintah dari app ----
 self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') {
     self.skipWaiting();
